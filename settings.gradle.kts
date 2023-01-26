@@ -1,2 +1,2 @@
-rootProject.name = "CHANGE_THAT"
-include("main")
+rootProject.name = "hope"
+include("hope")
