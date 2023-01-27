@@ -2,12 +2,6 @@ plugins {
     java
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(18))
-    }
-}
-
 tasks {
     register<tequila.ValidateCommitsGitTask>("validateCommits")
     register<tequila.ValidateCommitMessageGitTask>("validateCommitMessageGit")
