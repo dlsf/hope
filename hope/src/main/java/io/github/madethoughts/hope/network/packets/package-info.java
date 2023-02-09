@@ -16,23 +16,4 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
-
-import java.nio.ByteBuffer;
-
-/**
- Used to deserialize packets
- */
-public class Deserializer {
-
-    /**
-     Tries to deserialize a packet from bytes.
-     When the result is {@link DeserializerResult.PacketDeserialized}
-
-     @param buffer the buffer holding the bytes
-     @return the result of the deserialization
-     */
-    public DeserializerResult tryDeserialize(ByteBuffer buffer) {
-        return new DeserializerResult.MoreBytesNeeded(10);
-    }
-}
+package io.github.madethoughts.hope.network.packets;

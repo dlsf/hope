@@ -1,3 +1,21 @@
+/*
+ *     Hope - A minecraft server reimplementation
+ *     Copyright (C) 2023 Nick Hensel and contributors
+ *
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU Affero General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU Affero General Public License for more details.
+ *
+ *     You should have received a copy of the GNU Affero General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.Packet;
@@ -64,8 +82,7 @@ public final class Pipeline implements AutoCloseable {
 
                 System.out.printf("Got some bytes %s%n", buffer);
                 switch (deserializer.tryDeserialize(buffer)) {
-                    case DeserializerResult.UnknownPacket(var id) ->
-                            throw new IllegalStateException("Packet unknown %s".formatted(id));
+                    case DeserializerResult.UnknownPacket(var id) -> throw new IllegalStateException("Packet unknown %s".formatted(id));
                     case DeserializerResult.PacketDeserialized(var packet) -> packetQueue.put(packet);
                     case DeserializerResult.MoreBytesNeeded(var size) -> {
                         if (size > buffer.capacity()) {
