@@ -16,11 +16,10 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
+package io.github.madethoughts.hope.network.packets.clientbound;
 
 import java.nio.ByteBuffer;
 
-public interface Deserializer {
-
-    DeserializerResult tryDeserialize(ByteBuffer buffer);
+public interface ClientboundPacket {
+    void serialize(ByteBuffer buffer);
 }

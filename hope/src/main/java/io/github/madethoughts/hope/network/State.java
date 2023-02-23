@@ -16,11 +16,31 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
+package io.github.madethoughts.hope.network;
+
+import io.github.madethoughts.hope.network.packets.deserialization.Types;
 
 import java.nio.ByteBuffer;
 
-public interface Deserializer {
+public enum State {
+    HANDSHAKE,
+    STATUS,
+    LOGIN,
+    PLAY;
 
-    DeserializerResult tryDeserialize(ByteBuffer buffer);
+    public static State deserialize(ByteBuffer buffer, State... permitted) throws Types.TypeDeserializationException {
+        final var errorMsg = "Unexpected state";
+
+        var state = (State) switch (Types.varInt(buffer)) {
+            case 0 -> HANDSHAKE;
+            case 1 -> STATUS;
+            case 2 -> LOGIN;
+
+            default -> Types.throwSerdeException(errorMsg);
+        };
+        for (var current : permitted) {
+            if (current == state) return state;
+        }
+        return Types.throwSerdeException(errorMsg);
+    }
 }

@@ -18,9 +18,10 @@
 
 package io.github.madethoughts.hope.network;
 
-import io.github.madethoughts.hope.network.packets.Packet;
-import io.github.madethoughts.hope.network.packets.deserialization.Deserializer;
 import io.github.madethoughts.hope.network.packets.deserialization.DeserializerResult;
+import io.github.madethoughts.hope.network.packets.deserialization.PacketDeserializer;
+import io.github.madethoughts.hope.network.packets.serverbound.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 import java.io.IOException;
 import java.net.SocketAddress;
@@ -31,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.logging.Logger;
 
 /**
  This pipelines waits for new clients to connect, reads/deserializes their packets and puts them in
@@ -38,11 +40,13 @@ import java.util.concurrent.LinkedBlockingQueue;
  */
 public final class Pipeline implements AutoCloseable {
 
-    // TODO: 2/9/23 Choose channel size, or add config option
-    private final BlockingQueue<Packet> packetQueue = new LinkedBlockingQueue<>(32);
-    private final Map<SocketAddress, SocketChannel> connections = new ConcurrentHashMap<>();
+    private static final Logger log = Logger.getAnonymousLogger();
 
-    private final Deserializer deserializer = new Deserializer();
+    // TODO: 2/9/23 Choose channel size, or add config option
+    private final BlockingQueue<ServerboundPacket> packetQueue = new LinkedBlockingQueue<>(32);
+    private final Map<SocketAddress, Connection> connections = new ConcurrentHashMap<>();
+
+    private final PacketDeserializer deserializer = new PacketDeserializer();
     private final ServerSocketChannel socketChannel;
     private final Thread listenerThread = Thread.ofVirtual()
                                                 .name("PacketListenerThread")
@@ -69,27 +73,44 @@ public final class Pipeline implements AutoCloseable {
         return handler;
     }
 
-    private void listen(SocketChannel clientConnection) {
-        try (clientConnection) {
-            // TODO: 2/9/23 choose better size
-            var buffer = ByteBuffer.allocateDirect(100);
+    private void listen(Connection connection) {
+        var channel = connection.socketChannel();
+        try (channel) {
+            var buffer = ByteBuffer.allocateDirect(32);
+
             int num;
             int neededBytes = 0;
             do {
-                num = clientConnection.read(buffer);
-
+                num = channel.read(buffer);
                 if (buffer.position() < neededBytes) continue;
+                boolean anotherRun;
+                do {
+                    anotherRun = false;
+                    var state = connection.state();
 
-                System.out.printf("Got some bytes %s%n", buffer);
-                switch (deserializer.tryDeserialize(buffer)) {
-                    case DeserializerResult.UnknownPacket(var id) -> throw new IllegalStateException("Packet unknown %s".formatted(id));
-                    case DeserializerResult.PacketDeserialized(var packet) -> packetQueue.put(packet);
-                    case DeserializerResult.MoreBytesNeeded(var size) -> {
-                        if (size > buffer.capacity()) {
-                            buffer = ByteBuffer.allocateDirect(size);
+                    switch (deserializer.tryDeserialize(state, buffer)) {
+                        case DeserializerResult.UnknownPacket(var ustate, var id) -> throw new IllegalStateException(
+                                "Packetnknown %s: %s".formatted(ustate, id));
+                        case DeserializerResult.PacketDeserialized(var packet) -> {
+                            Logger.getAnonymousLogger().info("Got packet: %s".formatted(packet));
+                            switch (state) {
+                                case HANDSHAKE -> connection.state(((Handshake) packet).nextState());
+                                case STATUS -> throw new RuntimeException("todo status");
+                                case LOGIN -> throw new RuntimeException("todo login");
+                                case PLAY -> packetQueue.put(packet);
+                            }
+                            anotherRun = true;
+                        }
+                        case DeserializerResult.MoreBytesNeeded(var size) -> {
+                            if (size > buffer.capacity()) {
+                                buffer = ByteBuffer.allocateDirect(size);
+                            }
+                        }
+                        case DeserializerResult.Failed failed -> {
+                            log.info("failed: %s".formatted(channel));
                         }
                     }
-                }
+                } while (anotherRun);
             } while (num != -1);
         } catch (IOException | InterruptedException e) {
             // TODO: 2/9/23 logging
@@ -101,8 +122,11 @@ public final class Pipeline implements AutoCloseable {
         while (socketChannel.isOpen()) {
             try {
                 var channel = socketChannel.accept();
-                connections.put(channel.getRemoteAddress(), channel);
-                Thread.startVirtualThread(() -> listen(channel));
+                log.info("New connection: %s".formatted(channel.getRemoteAddress()));
+                var connection = new Connection(channel, State.HANDSHAKE);
+                connections.put(channel.getRemoteAddress(), connection);
+                Thread.startVirtualThread(() -> listen(connection))
+                      .setName("Listener for %s".formatted(channel.getRemoteAddress()));
             } catch (IOException e) {
                 // TODO: 2/9/23 logging
                 throw new RuntimeException(e);
@@ -122,5 +146,9 @@ public final class Pipeline implements AutoCloseable {
     @Override
     public void close() throws IOException {
         socketChannel.close();
+    }
+
+    public BlockingQueue<ServerboundPacket> packetQueue() {
+        return packetQueue;
     }
 }

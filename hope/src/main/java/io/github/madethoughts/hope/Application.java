@@ -22,11 +22,13 @@ import io.github.madethoughts.hope.network.Pipeline;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.logging.Logger;
 
 /**
  The programms main entry
  */
 public final class Application {
+
     private Application() {
     }
 
@@ -34,7 +36,16 @@ public final class Application {
         var socketHandler = Pipeline.openAndListen(new InetSocketAddress(25565));
         try (socketHandler) {
             System.out.printf("Listening on %n", socketHandler.address());
-            for (; ; ) ;
+            Thread.startVirtualThread(() -> {
+                for (; ; ) {
+                    try {
+                        var packet = socketHandler.packetQueue().take();
+                        Logger.getAnonymousLogger().info("Got packet (play): %s".formatted(packet));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }).join();
         }
     }
 }

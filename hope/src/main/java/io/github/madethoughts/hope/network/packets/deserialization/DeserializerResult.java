@@ -18,12 +18,13 @@
 
 package io.github.madethoughts.hope.network.packets.deserialization;
 
-import io.github.madethoughts.hope.network.packets.Packet;
+import io.github.madethoughts.hope.network.State;
+import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 import java.nio.ByteBuffer;
 
 /**
- Results of the {@link Deserializer#tryDeserialize(ByteBuffer)} method
+ Results of the {@link PacketDeserializer#tryDeserialize(State, ByteBuffer)} method
  */
 // all value classes
 public sealed interface DeserializerResult {
@@ -35,10 +36,15 @@ public sealed interface DeserializerResult {
     /**
      @param packet the deserialized packet
      */
-    record PacketDeserialized(Packet packet) implements DeserializerResult {}
+    record PacketDeserialized(ServerboundPacket packet) implements DeserializerResult {}
 
     /**
      @param id the if of the unknown packet
      */
-    record UnknownPacket(int id) implements DeserializerResult {}
+    record UnknownPacket(State state, int id) implements DeserializerResult {}
+
+    /**
+     @param reason why the deserialization failed
+     */
+    record Failed(String reason) implements DeserializerResult {}
 }

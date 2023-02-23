@@ -16,11 +16,11 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
+package io.github.madethoughts.hope.network.packets.serverbound;
 
-import java.nio.ByteBuffer;
+import io.github.madethoughts.hope.network.packets.deserialization.DeserializerResult;
 
-public interface Deserializer {
-
-    DeserializerResult tryDeserialize(ByteBuffer buffer);
+public record StatusRequest() implements ServerboundPacket {
+    // packet contains no fields, using singleton to prevent unnecessary objects
+    public static final DeserializerResult SINGLETON = new DeserializerResult.PacketDeserialized(new StatusRequest());
 }

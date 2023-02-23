@@ -16,8 +16,6 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets;
+package io.github.madethoughts.hope.network.packets.serverbound;
 
-public interface Packet {
-
-}
+public interface ServerboundPacket {}
