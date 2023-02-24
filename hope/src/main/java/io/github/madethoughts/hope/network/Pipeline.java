@@ -18,9 +18,7 @@
 
 package io.github.madethoughts.hope.network;
 
-import io.github.madethoughts.hope.network.packets.deserialization.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.deserialization.PacketDeserializer;
-import io.github.madethoughts.hope.network.packets.serverbound.Handshake;
+import io.github.madethoughts.hope.network.packets.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 import java.io.IOException;
@@ -45,8 +43,6 @@ public final class Pipeline implements AutoCloseable {
     // TODO: 2/9/23 Choose channel size, or add config option
     private final BlockingQueue<ServerboundPacket> packetQueue = new LinkedBlockingQueue<>(32);
     private final Map<SocketAddress, Connection> connections = new ConcurrentHashMap<>();
-
-    private final PacketDeserializer deserializer = new PacketDeserializer();
     private final ServerSocketChannel socketChannel;
     private final Thread listenerThread = Thread.ofVirtual()
                                                 .name("PacketListenerThread")
@@ -73,60 +69,25 @@ public final class Pipeline implements AutoCloseable {
         return handler;
     }
 
-    private void listen(Connection connection) {
-        var channel = connection.socketChannel();
-        try (channel) {
-            var buffer = ByteBuffer.allocateDirect(32);
-
-            int num;
-            int neededBytes = 0;
-            do {
-                num = channel.read(buffer);
-                if (buffer.position() < neededBytes) continue;
-                boolean anotherRun;
-                do {
-                    anotherRun = false;
-                    var state = connection.state();
-
-                    switch (deserializer.tryDeserialize(state, buffer)) {
-                        case DeserializerResult.UnknownPacket(var ustate, var id) -> throw new IllegalStateException(
-                                "Packetnknown %s: %s".formatted(ustate, id));
-                        case DeserializerResult.PacketDeserialized(var packet) -> {
-                            Logger.getAnonymousLogger().info("Got packet: %s".formatted(packet));
-                            switch (state) {
-                                case HANDSHAKE -> connection.state(((Handshake) packet).nextState());
-                                case STATUS -> throw new RuntimeException("todo status");
-                                case LOGIN -> throw new RuntimeException("todo login");
-                                case PLAY -> packetQueue.put(packet);
-                            }
-                            anotherRun = true;
-                        }
-                        case DeserializerResult.MoreBytesNeeded(var size) -> {
-                            if (size > buffer.capacity()) {
-                                buffer = ByteBuffer.allocateDirect(size);
-                            }
-                        }
-                        case DeserializerResult.Failed failed -> {
-                            log.info("failed: %s".formatted(channel));
-                        }
-                    }
-                } while (anotherRun);
-            } while (num != -1);
-        } catch (IOException | InterruptedException e) {
-            // TODO: 2/9/23 logging
-            throw new RuntimeException(e);
-        }
+    public DeserializerResult tryDeserialize(State state, ByteBuffer buffer) {
+        return ServerboundPacket.tryDeserialize(state, buffer);
     }
 
     private void listenForConnections() {
         while (socketChannel.isOpen()) {
             try {
-                var channel = socketChannel.accept();
-                log.info("New connection: %s".formatted(channel.getRemoteAddress()));
-                var connection = new Connection(channel, State.HANDSHAKE);
-                connections.put(channel.getRemoteAddress(), connection);
-                Thread.startVirtualThread(() -> listen(connection))
-                      .setName("Listener for %s".formatted(channel.getRemoteAddress()));
+                var clientChannel = socketChannel.accept();
+                var remoteAddress = clientChannel.getRemoteAddress();
+
+                log.info("New connection: %s".formatted(remoteAddress));
+
+                var connection = new Connection(clientChannel, State.HANDSHAKE);
+                connections.put(remoteAddress, connection);
+
+                Thread.startVirtualThread(() -> new PacketReceiver(this, connection).start())
+                      .setName("Listener for %s".formatted(remoteAddress));
+                Thread.startVirtualThread(() -> new PacketSender(connection).start())
+                      .setName("Sender for %s".formatted(remoteAddress));
             } catch (IOException e) {
                 // TODO: 2/9/23 logging
                 throw new RuntimeException(e);
@@ -146,9 +107,5 @@ public final class Pipeline implements AutoCloseable {
     @Override
     public void close() throws IOException {
         socketChannel.close();
-    }
-
-    public BlockingQueue<ServerboundPacket> packetQueue() {
-        return packetQueue;
     }
 }

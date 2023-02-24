@@ -18,9 +18,9 @@
 
 package io.github.madethoughts.hope.network.packets.serverbound;
 
-import io.github.madethoughts.hope.network.packets.deserialization.DeserializerResult;
+import io.github.madethoughts.hope.network.packets.DeserializerResult;
 
-public record StatusRequest() implements ServerboundPacket {
+public record StatusRequest() implements ServerboundPacket.StatusPacket {
     // packet contains no fields, using singleton to prevent unnecessary objects
     public static final DeserializerResult SINGLETON = new DeserializerResult.PacketDeserialized(new StatusRequest());
 }

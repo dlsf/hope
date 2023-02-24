@@ -16,25 +16,12 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.clientbound;
+package io.github.madethoughts.hope.network.packets;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 
-public record StatusRespond(
-        String versionName,
-        int protocolVersion,
+@FunctionalInterface
+public interface Deserializer {
 
-        // todo use players
-        List<Object> players,
-        // todo support chat object
-        String description,
-        String favicon,
-        boolean previewChat,
-        boolean enforcesSecureChat
-) implements ClientboundPacket {
-    @Override
-    public void serialize(ByteBuffer buffer) {
-
-    }
+    DeserializerResult tryDeserialize(ByteBuffer buffer);
 }

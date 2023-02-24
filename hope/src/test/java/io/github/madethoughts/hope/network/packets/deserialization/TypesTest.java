@@ -18,6 +18,7 @@
 
 package io.github.madethoughts.hope.network.packets.deserialization;
 
+import io.github.madethoughts.hope.network.packets.clientbound.Types;
 import org.junit.jupiter.api.Test;
 
 import java.nio.ByteBuffer;
@@ -31,7 +32,7 @@ class TypesTest {
     void testVarInt() throws Types.TypeDeserializationException {
         var bytes = new byte[]{(byte) 0b1000_1011, (byte) 0b0000_0011}; // 19
 
-        var varInt = Types.varInt(ByteBuffer.wrap(bytes));
+        var varInt = Types.readVarInt(ByteBuffer.wrap(bytes));
         assertEquals(395, varInt);
     }
 
@@ -43,7 +44,7 @@ class TypesTest {
         buffer.put((byte) stringBytes.length);
         buffer.put(stringBytes);
         buffer.position(0);
-        assertEquals(string, Types.string(buffer));
+        assertEquals(string, Types.readUtf8(buffer));
     }
 
     @Test
@@ -52,6 +53,6 @@ class TypesTest {
         var buffer = ByteBuffer.allocate(2);
         buffer.putShort((short) i);
         buffer.position(0);
-        assertEquals(i, Types.unsignedShort(buffer));
+        assertEquals(i, Types.readUShort(buffer));
     }
 }

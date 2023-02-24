@@ -18,7 +18,7 @@
 
 package io.github.madethoughts.hope.network;
 
-import io.github.madethoughts.hope.network.packets.deserialization.Types;
+import io.github.madethoughts.hope.network.packets.clientbound.Types;
 
 import java.nio.ByteBuffer;
 
@@ -31,7 +31,7 @@ public enum State {
     public static State deserialize(ByteBuffer buffer, State... permitted) throws Types.TypeDeserializationException {
         final var errorMsg = "Unexpected state";
 
-        var state = (State) switch (Types.varInt(buffer)) {
+        var state = (State) switch (Types.readVarInt(buffer)) {
             case 0 -> HANDSHAKE;
             case 1 -> STATUS;
             case 2 -> LOGIN;

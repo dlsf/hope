@@ -20,6 +20,11 @@ package io.github.madethoughts.hope.network.packets.clientbound;
 
 import java.nio.ByteBuffer;
 
-public interface ClientboundPacket {
+public sealed interface ClientboundPacket permits PingResponse, StatusResponse {
+
     void serialize(ByteBuffer buffer);
+
+    int computeSize();
+
+    int id();
 }

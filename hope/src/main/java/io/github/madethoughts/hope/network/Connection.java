@@ -26,7 +26,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class Connection {
     private final SocketChannel socketChannel;
-
     private final BlockingQueue<ClientboundPacket> clientboundPackets = new LinkedBlockingQueue<>(6);
     private State state;
 
@@ -49,5 +48,9 @@ public class Connection {
 
     public BlockingQueue<ClientboundPacket> clientboundPackets() {
         return clientboundPackets;
+    }
+
+    public void queuePacket(ClientboundPacket packet) throws InterruptedException {
+        clientboundPackets.put(packet);
     }
 }

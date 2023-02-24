@@ -19,23 +19,23 @@
 package io.github.madethoughts.hope.network.packets.serverbound;
 
 import io.github.madethoughts.hope.network.State;
-import io.github.madethoughts.hope.network.packets.deserialization.Deserializer;
-import io.github.madethoughts.hope.network.packets.deserialization.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.deserialization.Types;
+import io.github.madethoughts.hope.network.packets.Deserializer;
+import io.github.madethoughts.hope.network.packets.DeserializerResult;
+import io.github.madethoughts.hope.network.packets.clientbound.Types;
 
 public record Handshake(
         int protocolNumber,
         String serverAddress,
         int serverPort,
         State nextState
-) implements ServerboundPacket {
+) implements ServerboundPacket.HandshakePacket {
 
     public static final Deserializer DESERIALIZER = buffer -> {
         try {
             var packet = new Handshake(
-                    Types.varInt(buffer),
-                    Types.string(buffer),
-                    Types.unsignedShort(buffer),
+                    Types.readVarInt(buffer),
+                    Types.readUtf8(buffer),
+                    Types.readUShort(buffer),
                     State.deserialize(buffer, State.STATUS, State.LOGIN)
             );
             return new DeserializerResult.PacketDeserialized(packet);

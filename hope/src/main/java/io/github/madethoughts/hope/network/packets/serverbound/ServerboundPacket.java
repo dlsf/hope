@@ -18,4 +18,55 @@
 
 package io.github.madethoughts.hope.network.packets.serverbound;
 
-public interface ServerboundPacket {}
+import io.github.madethoughts.hope.network.State;
+import io.github.madethoughts.hope.network.packets.DeserializerResult;
+import io.github.madethoughts.hope.network.packets.Packets;
+import io.github.madethoughts.hope.network.packets.clientbound.Types;
+
+import java.nio.ByteBuffer;
+
+public sealed interface ServerboundPacket
+        permits ServerboundPacket.HandshakePacket, ServerboundPacket.StatusPacket {
+
+    DeserializerResult.MoreBytesNeeded EMPTY_BUFFER_RESULT = new DeserializerResult.MoreBytesNeeded(1);
+
+    /**
+     Tries to deserialize a packet from bytes.
+     When the result is {@link DeserializerResult.PacketDeserialized}
+     the serialization was successful.
+
+     @param state  the client's current state
+     @param buffer the buffer holding the bytes
+     @return the result of the deserialization
+     */
+    static DeserializerResult tryDeserialize(State state, ByteBuffer buffer) {
+        var oldPos = buffer.position();
+
+        if (oldPos == 0) return EMPTY_BUFFER_RESULT; // buffer is empty, read more bytes
+        try {
+            buffer.flip();
+            var length = Types.readVarInt(buffer);
+
+            var totalSize = buffer.position() + length;
+            if (oldPos < totalSize) {
+                buffer.position(oldPos);
+                return new DeserializerResult.MoreBytesNeeded(totalSize);
+            }
+
+            var id = Types.readVarInt(buffer);
+            var deserialized = Packets.tryDeserialize(state, id, buffer);
+            buffer.compact();
+            return deserialized;
+        } catch (Types.TypeDeserializationException e) {
+            return new DeserializerResult.Failed(e.getMessage());
+        }
+    }
+
+    //    sealed interface LoginPacket extends ServerboundPacket {}
+    //
+    //    sealed interface PlayPacket extends ServerboundPacket {}
+
+    sealed interface HandshakePacket extends ServerboundPacket permits Handshake {}
+
+    sealed interface StatusPacket extends ServerboundPacket permits PingRequest, StatusRequest {}
+}

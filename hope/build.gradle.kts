@@ -4,30 +4,28 @@ plugins {
 }
 
 group = "io.github.madethoughts"
-version = "unspecified"
+version = "0.1"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation("org.openjdk.jol", "jol-core", "0.16")
+    implementation("org.json", "json", "20220924")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
 }
 
 
-//java {
-//    toolchain {
-//        languageVersion.set(JavaLanguageVersion.of(19))
-//    }
-//}
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(19))
+    }
+}
 
 val ENABLE_PREVIEW = listOf(
-    "--enable-preview",
-    "--add-exports",
-    "java.base/jdk.internal.vm.annotation=io.github.madethoughts.hope"
+    "--enable-preview"
 )
 application {
     mainModule.set("io.github.madethoughts.hope")

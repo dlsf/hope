@@ -16,7 +16,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
+package io.github.madethoughts.hope.network.packets;
 
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
@@ -24,7 +24,7 @@ import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket
 import java.nio.ByteBuffer;
 
 /**
- Results of the {@link PacketDeserializer#tryDeserialize(State, ByteBuffer)} method
+ Results of the {@link ServerboundPacket#tryDeserialize(State, ByteBuffer)} method
  */
 // all value classes
 public sealed interface DeserializerResult {

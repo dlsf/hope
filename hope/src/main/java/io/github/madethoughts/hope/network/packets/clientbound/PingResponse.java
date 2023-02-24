@@ -16,4 +16,26 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
+package io.github.madethoughts.hope.network.packets.clientbound;
+
+import java.nio.ByteBuffer;
+
+public record PingResponse(
+        long payload
+) implements ClientboundPacket {
+    @Override
+    public void serialize(ByteBuffer buffer) {
+        buffer.putLong(payload);
+    }
+
+    @Override
+    public int computeSize() {
+        return Long.BYTES;
+    }
+
+    @Override
+    public int id() {
+        return 1;
+    }
+
+}

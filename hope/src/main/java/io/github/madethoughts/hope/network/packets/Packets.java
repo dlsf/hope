@@ -19,9 +19,8 @@
 package io.github.madethoughts.hope.network.packets;
 
 import io.github.madethoughts.hope.network.State;
-import io.github.madethoughts.hope.network.packets.deserialization.Deserializer;
-import io.github.madethoughts.hope.network.packets.deserialization.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.serverbound.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.StatusRequest;
 
 import java.nio.ByteBuffer;
@@ -29,7 +28,8 @@ import java.nio.ByteBuffer;
 public enum Packets {
     HANDSHAKE(State.HANDSHAKE, 0x0, Handshake.DESERIALIZER),
 
-    STATUS_REQUEST(State.STATUS, 0x0, __ -> StatusRequest.SINGLETON);
+    STATUS_REQUEST(State.STATUS, 0x0, __ -> StatusRequest.SINGLETON),
+    PING_REQUEST(State.STATUS, 0x1, PingRequest.DESERIALIZER);
     // bypass copying array each time
     private static final Packets[] VALUES = values();
 
@@ -43,7 +43,7 @@ public enum Packets {
         this.deserializer = deserializer;
     }
 
-    public static DeserializerResult deserialize(State state, int id, ByteBuffer data) {
+    public static DeserializerResult tryDeserialize(State state, int id, ByteBuffer data) {
         for (var value : VALUES) {
             if (value.state == state && value.id == id) {
                 return value.deserializer.tryDeserialize(data);

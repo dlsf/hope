@@ -16,11 +16,17 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.deserialization;
+package io.github.madethoughts.hope.network.packets.serverbound;
 
-import java.nio.ByteBuffer;
+import io.github.madethoughts.hope.network.packets.Deserializer;
+import io.github.madethoughts.hope.network.packets.DeserializerResult;
+import io.github.madethoughts.hope.network.packets.clientbound.Types;
 
-public interface Deserializer {
-
-    DeserializerResult tryDeserialize(ByteBuffer buffer);
+public record PingRequest(
+        long payload
+) implements ServerboundPacket.StatusPacket {
+    public static final Deserializer DESERIALIZER = buffer -> {
+        var payload = Types.readLong(buffer);
+        return new DeserializerResult.PacketDeserialized(new PingRequest(payload));
+    };
 }
