@@ -19,11 +19,9 @@
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
-import io.github.madethoughts.hope.network.packets.clientbound.PingResponse;
-import io.github.madethoughts.hope.network.packets.clientbound.Types;
+import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
 
 import java.io.IOException;
-import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
@@ -38,7 +36,7 @@ public class PacketSender {
     private final ByteBuffer lengthBuffer = ByteBuffer.allocate(5);
 
     // enough capacity to send list ping response without resizing
-    private ByteBuffer buffer = ByteBuffer.allocate(512);
+    private final ResizableByteBuffer buffer = new ResizableByteBuffer();
 
     public PacketSender(Connection connection) {
         this.connection = connection;
@@ -53,11 +51,11 @@ public class PacketSender {
                 deserialize(packet);
 
                 channel.write(lengthBuffer.flip());
-                channel.write(buffer.flip());
+                channel.write(buffer.nioBuffer().flip());
                 log.info("Send %s to %s".formatted(packet, channel.getRemoteAddress()));
 
                 if (connection.state() == State.STATUS && packet instanceof PingResponse) {
-                    connection.socketChannel().close();
+                    channel.shutdownInput();
                 }
 
             } catch (InterruptedException | IOException e) {
@@ -68,22 +66,11 @@ public class PacketSender {
     }
 
     private void deserialize(ClientboundPacket packet) {
-        try {
-            buffer.clear();
-            Types.writeVarInt(buffer, packet.id());
-            packet.serialize(buffer);
+        buffer.clear();
+        buffer.writeVarInt(packet.id());
+        packet.serialize(buffer);
 
-            lengthBuffer.clear();
-            Types.writeVarInt(lengthBuffer, buffer.position());
-        } catch (BufferOverflowException e) {
-            resizeBuffer(packet);
-            deserialize(packet);
-        }
-    }
-
-    private void resizeBuffer(ClientboundPacket packet) {
-        // append max header size of 10 bytes
-        var neededSize = packet.computeSize() + Types.VARINT_MAX_SIZE * 2;
-        buffer = ByteBuffer.allocateDirect(neededSize);
+        lengthBuffer.clear();
+        ResizableByteBuffer.writeVarInt(lengthBuffer, buffer.position());
     }
 }

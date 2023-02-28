@@ -18,7 +18,7 @@
 
 package io.github.madethoughts.hope;
 
-import io.github.madethoughts.hope.network.Pipeline;
+import io.github.madethoughts.hope.network.Gatekeeper;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -32,7 +32,7 @@ public final class Application {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        var socketHandler = Pipeline.openAndListen(new InetSocketAddress(25565));
+        var socketHandler = Gatekeeper.openAndListen(new InetSocketAddress(25565));
         try (socketHandler) {
             System.out.printf("Listening on %n", socketHandler.address());
             Thread.startVirtualThread(() -> {

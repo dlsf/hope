@@ -19,41 +19,39 @@
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.clientbound.PingResponse;
-import io.github.madethoughts.hope.network.packets.clientbound.StatusResponse;
-import io.github.madethoughts.hope.network.packets.serverbound.Handshake;
-import io.github.madethoughts.hope.network.packets.serverbound.PingRequest;
+import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
+import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
-import io.github.madethoughts.hope.network.packets.serverbound.StatusRequest;
+import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
+import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
 public final class PacketReceiver {
 
     private static final Logger log = Logger.getLogger(PacketReceiver.class.getName());
 
-    private final Pipeline pipeline;
     private final Connection connection;
-    private ByteBuffer buffer = ByteBuffer.allocate(32);
+    private final ResizableByteBuffer buffer = new ResizableByteBuffer();
 
-    public PacketReceiver(Pipeline pipeline, Connection connection) {
-        this.pipeline = pipeline;
+    public PacketReceiver(Connection connection) {
         this.connection = connection;
     }
 
-    public void start() {
+    public void listen() {
         var channel = connection.socketChannel();
         try (channel) {
-            int byteNum;
-            int neededBytes = 0;
-            do {
-                byteNum = channel.read(buffer);
+            var neededBytes = 0;
+            while (channel.isOpen() && channel.read(buffer.nioBuffer()) != -1) {
                 if (buffer.position() < neededBytes) continue;
 
                 neededBytes = deserializeAndHandle();
-            } while (byteNum != -1);
+
+                buffer.ensureCapacity(neededBytes);
+            }
+            log.info("Disconnected %s".formatted(channel.getRemoteAddress()));
         } catch (IOException e) {
             // TODO: 2/9/23 logging
             throw new RuntimeException(e);
@@ -61,36 +59,36 @@ public final class PacketReceiver {
     }
 
     private int deserializeAndHandle() {
-        var state = connection.state();
-
-        switch (pipeline.tryDeserialize(state, buffer)) {
-            case DeserializerResult.UnknownPacket(var ustate, var id) ->
-                    throw new IllegalStateException("Packetnknown %s: %s".formatted(ustate, id));
-            case DeserializerResult.PacketDeserialized(var packet) -> {
-                log.info("Got packet: %s".formatted(packet));
-                switch (state) {
-                    case HANDSHAKE -> connection.state(((Handshake) packet).nextState());
-                    case STATUS -> handleStatus(packet);
-                    case LOGIN -> throw new UnsupportedOperationException("todo login"); // TODO: 2/24/23
-                    case PLAY -> throw new UnsupportedOperationException("todo play"); // TODO: 2/24/23
+        while (true) {
+            var state = connection.state();
+            buffer.flip();
+            switch (ServerboundPacket.tryDeserialize(state, buffer)) {
+                case DeserializerResult.UnknownPacket(var ustate, var id) ->
+                        throw new IllegalStateException("Packetnknown %s: %s".formatted(ustate, id));
+                case DeserializerResult.PacketDeserialized(var packet) -> {
+                    log.info("Got packet: %s".formatted(packet));
+                    switch (state) {
+                        case HANDSHAKE -> connection.state(((Handshake) packet).nextState());
+                        case STATUS -> handleStatus(packet);
+                        case LOGIN -> throw new UnsupportedOperationException("todo login"); // TODO: 2/24/23
+                        case PLAY -> throw new UnsupportedOperationException("todo play"); // TODO: 2/24/23
+                    }
+                    // try to deserialize left bytes
+                    continue;
                 }
-                deserializeAndHandle(); // try to deserialize left bytes, if any. tail recursion is ok here
-            }
-            case DeserializerResult.MoreBytesNeeded(var size) -> {
-                adjustBuffer(size);
-                return size;
-            }
-            case DeserializerResult.Failed failed -> {
-                log.info("failed: %s".formatted(failed.reason()));
-            }
-        }
-        return 0;
-    }
+                case DeserializerResult.MoreBytesNeeded(var size) -> {
+                    // don't override data already written in the buffer
+                    var pos = buffer.limit();
+                    buffer.clear();
+                    buffer.position(pos);
 
-    private void adjustBuffer(int size) {
-        if (size > buffer.capacity()) {
-            buffer = ByteBuffer.allocate(size)
-                               .put(buffer.rewind());
+                    return size;
+                }
+                case DeserializerResult.Failed failed -> {
+                    log.info("failed: %s".formatted(failed.reason()));
+                }
+            }
+            return 1;
         }
     }
 

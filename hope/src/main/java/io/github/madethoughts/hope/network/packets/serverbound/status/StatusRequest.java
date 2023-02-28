@@ -16,15 +16,8 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.clientbound;
+package io.github.madethoughts.hope.network.packets.serverbound.status;
 
-import io.github.madethoughts.hope.network.ResizableByteBuffer;
-import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
-import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
+import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
-public sealed interface ClientboundPacket permits PingResponse, StatusResponse {
-
-    void serialize(ResizableByteBuffer buffer);
-
-    int id();
-}
+public record StatusRequest() implements ServerboundPacket.StatusPacket {}

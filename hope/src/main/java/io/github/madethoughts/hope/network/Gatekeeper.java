@@ -18,37 +18,28 @@
 
 package io.github.madethoughts.hope.network;
 
-import io.github.madethoughts.hope.network.packets.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
-
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Logger;
 
 /**
  This pipelines waits for new clients to connect, reads/deserializes their packets and puts them in
  a queue to be taken by a receiver (the game loop)
  */
-public final class Pipeline implements AutoCloseable {
+public final class Gatekeeper implements AutoCloseable {
 
     private static final Logger log = Logger.getAnonymousLogger();
-
-    // TODO: 2/9/23 Choose channel size, or add config option
-    private final BlockingQueue<ServerboundPacket> packetQueue = new LinkedBlockingQueue<>(32);
     private final Map<SocketAddress, Connection> connections = new ConcurrentHashMap<>();
     private final ServerSocketChannel socketChannel;
     private final Thread listenerThread = Thread.ofVirtual()
                                                 .name("PacketListenerThread")
                                                 .unstarted(this::listenForConnections);
 
-    private Pipeline(ServerSocketChannel socketChannel) {
+    private Gatekeeper(ServerSocketChannel socketChannel) {
         this.socketChannel = socketChannel;
     }
 
@@ -61,16 +52,12 @@ public final class Pipeline implements AutoCloseable {
      @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
      @throws RuntimeException some exception from one of the virtual threads
      */
-    public static Pipeline openAndListen(SocketAddress address) throws IOException {
+    public static Gatekeeper openAndListen(SocketAddress address) throws IOException {
         var channel = ServerSocketChannel.open();
         channel.socket().bind(address);
-        var handler = new Pipeline(channel);
+        var handler = new Gatekeeper(channel);
         handler.listenerThread.start();
         return handler;
-    }
-
-    public DeserializerResult tryDeserialize(State state, ByteBuffer buffer) {
-        return ServerboundPacket.tryDeserialize(state, buffer);
     }
 
     private void listenForConnections() {
@@ -84,7 +71,7 @@ public final class Pipeline implements AutoCloseable {
                 var connection = new Connection(clientChannel, State.HANDSHAKE);
                 connections.put(remoteAddress, connection);
 
-                Thread.startVirtualThread(() -> new PacketReceiver(this, connection).start())
+                Thread.startVirtualThread(() -> new PacketReceiver(connection).listen())
                       .setName("Listener for %s".formatted(remoteAddress));
                 Thread.startVirtualThread(() -> new PacketSender(connection).start())
                       .setName("Sender for %s".formatted(remoteAddress));

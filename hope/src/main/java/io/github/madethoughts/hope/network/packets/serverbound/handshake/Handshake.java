@@ -16,12 +16,11 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.serverbound;
+package io.github.madethoughts.hope.network.packets.serverbound.handshake;
 
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.Deserializer;
-import io.github.madethoughts.hope.network.packets.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.clientbound.Types;
+import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 public record Handshake(
         int protocolNumber,
@@ -30,17 +29,10 @@ public record Handshake(
         State nextState
 ) implements ServerboundPacket.HandshakePacket {
 
-    public static final Deserializer DESERIALIZER = buffer -> {
-        try {
-            var packet = new Handshake(
-                    Types.readVarInt(buffer),
-                    Types.readUtf8(buffer),
-                    Types.readUShort(buffer),
-                    State.deserialize(buffer, State.STATUS, State.LOGIN)
-            );
-            return new DeserializerResult.PacketDeserialized(packet);
-        } catch (Types.TypeDeserializationException e) {
-            return new DeserializerResult.Failed(e.getMessage());
-        }
-    };
+    public static final Deserializer<Handshake> DESERIALIZER = buffer -> new Handshake(
+            buffer.readVarInt(),
+            buffer.readString(),
+            buffer.readUShort(),
+            State.deserialize(buffer, State.STATUS, State.LOGIN)
+    );
 }

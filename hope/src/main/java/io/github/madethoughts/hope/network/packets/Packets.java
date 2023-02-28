@@ -18,35 +18,35 @@
 
 package io.github.madethoughts.hope.network.packets;
 
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
-import io.github.madethoughts.hope.network.packets.serverbound.Handshake;
-import io.github.madethoughts.hope.network.packets.serverbound.PingRequest;
-import io.github.madethoughts.hope.network.packets.serverbound.StatusRequest;
-
-import java.nio.ByteBuffer;
+import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
+import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
 public enum Packets {
     HANDSHAKE(State.HANDSHAKE, 0x0, Handshake.DESERIALIZER),
 
-    STATUS_REQUEST(State.STATUS, 0x0, __ -> StatusRequest.SINGLETON),
+    STATUS_REQUEST(State.STATUS, 0x0, __ -> new StatusRequest()),
     PING_REQUEST(State.STATUS, 0x1, PingRequest.DESERIALIZER);
     // bypass copying array each time
     private static final Packets[] VALUES = values();
 
     private final State state;
     private final int id;
-    private final Deserializer deserializer;
+    private final Deserializer<?> deserializer;
 
-    Packets(State state, int id, Deserializer deserializer) {
+    Packets(State state, int id, Deserializer<?> deserializer) {
         this.state = state;
         this.id = id;
         this.deserializer = deserializer;
     }
 
-    public static DeserializerResult tryDeserialize(State state, int id, ByteBuffer data) {
+    public static DeserializerResult tryDeserialize(State state, int id, ResizableByteBuffer data) {
         for (var value : VALUES) {
             if (value.state == state && value.id == id) {
-                return value.deserializer.tryDeserialize(data);
+                var packet = value.deserializer.tryDeserialize(data);
+                return new DeserializerResult.PacketDeserialized(packet);
             }
         }
         return new DeserializerResult.UnknownPacket(state, id);

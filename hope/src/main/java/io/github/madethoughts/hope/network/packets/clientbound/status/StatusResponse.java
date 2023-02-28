@@ -16,13 +16,13 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.clientbound;
+package io.github.madethoughts.hope.network.packets.clientbound.status;
 
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
+import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 public record StatusResponse(
@@ -35,21 +35,7 @@ public record StatusResponse(
         boolean enforcesSecureChat
 ) implements ClientboundPacket {
     @Override
-    public void serialize(ByteBuffer buffer) {
-        Types.writeUtf8(buffer, computeJson());
-    }
-
-    @Override
-    public int computeSize() {
-        return Types.utf8Size(computeJson());
-    }
-
-    @Override
-    public int id() {
-        return 0;
-    }
-
-    private byte[] computeJson() {
+    public void serialize(ResizableByteBuffer buffer) {
         var faviconString = "data:image/png;base64," + Base64.getEncoder().encodeToString(favicon());
 
         var json = new JSONObject()
@@ -69,7 +55,13 @@ public record StatusResponse(
                 .put("previewsChat", previewChat())
                 .put("enforcesSecureChat", enforcesSecureChat());
 
-        return json.toString().getBytes(StandardCharsets.UTF_8);
+        buffer.writeString(json.toString());
+    }
+
+
+    @Override
+    public int id() {
+        return 0;
     }
 
     public record Version(

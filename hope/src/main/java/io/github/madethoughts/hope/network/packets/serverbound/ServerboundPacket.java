@@ -18,17 +18,18 @@
 
 package io.github.madethoughts.hope.network.packets.serverbound;
 
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.Packets;
-import io.github.madethoughts.hope.network.packets.clientbound.Types;
-
-import java.nio.ByteBuffer;
+import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
+import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
 public sealed interface ServerboundPacket
         permits ServerboundPacket.HandshakePacket, ServerboundPacket.StatusPacket {
 
-    DeserializerResult.MoreBytesNeeded EMPTY_BUFFER_RESULT = new DeserializerResult.MoreBytesNeeded(1);
+    DeserializerResult.MoreBytesNeeded NEED_SOME_BYTES = new DeserializerResult.MoreBytesNeeded(1);
 
     /**
      Tries to deserialize a packet from bytes.
@@ -39,25 +40,23 @@ public sealed interface ServerboundPacket
      @param buffer the buffer holding the bytes
      @return the result of the deserialization
      */
-    static DeserializerResult tryDeserialize(State state, ByteBuffer buffer) {
-        var oldPos = buffer.position();
-
-        if (oldPos == 0) return EMPTY_BUFFER_RESULT; // buffer is empty, read more bytes
+    static DeserializerResult tryDeserialize(State state, ResizableByteBuffer buffer) {
         try {
-            buffer.flip();
-            var length = Types.readVarInt(buffer);
-
-            var totalSize = buffer.position() + length;
-            if (oldPos < totalSize) {
-                buffer.position(oldPos);
-                return new DeserializerResult.MoreBytesNeeded(totalSize);
+            var lengthOpt = buffer.tryReadVarInt();
+            if (lengthOpt.isEmpty()) {
+                return NEED_SOME_BYTES;
             }
 
-            var id = Types.readVarInt(buffer);
+            var length = lengthOpt.getAsInt();
+            if (buffer.remaining() < length) {
+                return new DeserializerResult.MoreBytesNeeded(length);
+            }
+
+            var id = buffer.readVarInt();
             var deserialized = Packets.tryDeserialize(state, id, buffer);
             buffer.compact();
             return deserialized;
-        } catch (Types.TypeDeserializationException e) {
+        } catch (ResizableByteBuffer.TypeDeserializationException e) {
             return new DeserializerResult.Failed(e.getMessage());
         }
     }

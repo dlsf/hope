@@ -18,10 +18,11 @@
 
 package io.github.madethoughts.hope.network.packets;
 
-import java.nio.ByteBuffer;
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
+import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 @FunctionalInterface
-public interface Deserializer {
+public interface Deserializer<T extends ServerboundPacket> {
 
-    DeserializerResult tryDeserialize(ByteBuffer buffer);
+    T tryDeserialize(ResizableByteBuffer buffer);
 }

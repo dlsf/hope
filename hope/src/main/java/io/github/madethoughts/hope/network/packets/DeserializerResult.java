@@ -18,13 +18,12 @@
 
 package io.github.madethoughts.hope.network.packets;
 
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
-import java.nio.ByteBuffer;
-
 /**
- Results of the {@link ServerboundPacket#tryDeserialize(State, ByteBuffer)} method
+ Results of the {@link ServerboundPacket#tryDeserialize(State, ResizableByteBuffer)} method
  */
 // all value classes
 public sealed interface DeserializerResult {
