@@ -19,6 +19,7 @@
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
+import io.github.madethoughts.hope.profile.PlayerProfile;
 
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
@@ -28,6 +29,9 @@ public class Connection {
     private final SocketChannel socketChannel;
     private final BlockingQueue<ClientboundPacket> clientboundPackets = new LinkedBlockingQueue<>(6);
     private State state;
+    private McCipher decryptor;
+    private McCipher encryptor;
+    private PlayerProfile playerProfile;
 
     public Connection(SocketChannel socketChannel, State state) {
         this.socketChannel = socketChannel;
@@ -52,5 +56,29 @@ public class Connection {
 
     public void queuePacket(ClientboundPacket packet) throws InterruptedException {
         clientboundPackets.put(packet);
+    }
+
+    public McCipher decryptor() {
+        return decryptor;
+    }
+
+    public void decryptor(McCipher decryptor) {
+        this.decryptor = decryptor;
+    }
+
+    public McCipher encryptor() {
+        return encryptor;
+    }
+
+    public void encryptor(McCipher encryptor) {
+        this.encryptor = encryptor;
+    }
+
+    public PlayerProfile playerProfile() {
+        return playerProfile;
+    }
+
+    public void playerProfile(PlayerProfile playerProfile) {
+        this.playerProfile = playerProfile;
     }
 }

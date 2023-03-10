@@ -23,22 +23,23 @@ import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.Packets;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.login.EncryptionResponse;
+import io.github.madethoughts.hope.network.packets.serverbound.login.LoginStart;
 import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
-public sealed interface ServerboundPacket
-        permits ServerboundPacket.HandshakePacket, ServerboundPacket.StatusPacket {
+public sealed interface ServerboundPacket {
 
     DeserializerResult.MoreBytesNeeded NEED_SOME_BYTES = new DeserializerResult.MoreBytesNeeded(1);
 
     /**
-     Tries to deserialize a packet from bytes.
-     When the result is {@link DeserializerResult.PacketDeserialized}
-     the serialization was successful.
+     Tries to deserialize a packet from bytes, including reading size und making size checks.
+     The used {@link ResizableByteBuffer}'s position will be enhanced by the bytes read amount.
 
-     @param state  the client's current state
+     @param state  the client's current sta
+     te
      @param buffer the buffer holding the bytes
-     @return the result of the deserialization
+     @return the result of the deserialization using {@link DeserializerResult}
      */
     static DeserializerResult tryDeserialize(State state, ResizableByteBuffer buffer) {
         try {
@@ -61,11 +62,9 @@ public sealed interface ServerboundPacket
         }
     }
 
-    //    sealed interface LoginPacket extends ServerboundPacket {}
-    //
-    //    sealed interface PlayPacket extends ServerboundPacket {}
-
     sealed interface HandshakePacket extends ServerboundPacket permits Handshake {}
 
     sealed interface StatusPacket extends ServerboundPacket permits PingRequest, StatusRequest {}
+
+    sealed interface LoginPacket extends ServerboundPacket permits EncryptionResponse, LoginStart {}
 }

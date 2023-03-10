@@ -16,18 +16,29 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.clientbound;
+package io.github.madethoughts.hope.network.packets.clientbound.login;
 
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
-import io.github.madethoughts.hope.network.packets.clientbound.login.EncryptionRequest;
-import io.github.madethoughts.hope.network.packets.clientbound.login.LoginSuccess;
-import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
-import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
+import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
 
-public sealed interface ClientboundPacket
-        permits EncryptionRequest, LoginSuccess, PingResponse, StatusResponse {
+public record EncryptionRequest(
+        byte[] serverPublicKey,
+        byte[] verifyToken
+) implements ClientboundPacket {
 
-    void serialize(ResizableByteBuffer buffer);
+    public static final String SERVER_ID = "";
 
-    int id();
+    @Override
+    public void serialize(ResizableByteBuffer buffer) {
+        buffer.writeString(SERVER_ID); // server id, should be empty
+        buffer.writeVarInt(serverPublicKey.length);
+        buffer.writeArray(serverPublicKey);
+        buffer.writeVarInt(verifyToken.length);
+        buffer.writeArray(verifyToken);
+    }
+
+    @Override
+    public int id() {
+        return 1;
+    }
 }

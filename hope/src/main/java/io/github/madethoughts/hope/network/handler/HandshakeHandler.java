@@ -16,18 +16,19 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.clientbound;
+package io.github.madethoughts.hope.network.handler;
 
-import io.github.madethoughts.hope.network.ResizableByteBuffer;
-import io.github.madethoughts.hope.network.packets.clientbound.login.EncryptionRequest;
-import io.github.madethoughts.hope.network.packets.clientbound.login.LoginSuccess;
-import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
-import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
+import io.github.madethoughts.hope.network.Connection;
+import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 
-public sealed interface ClientboundPacket
-        permits EncryptionRequest, LoginSuccess, PingResponse, StatusResponse {
+public class HandshakeHandler implements PacketHandler<Handshake> {
+    private final Connection connection;
 
-    void serialize(ResizableByteBuffer buffer);
+    public HandshakeHandler(Connection connection) {this.connection = connection;}
 
-    int id();
+    @Override
+    public void handle(Handshake packet) {
+        // TODO: 3/10/23 protocol version validation
+        connection.state(packet.nextState());
+    }
 }

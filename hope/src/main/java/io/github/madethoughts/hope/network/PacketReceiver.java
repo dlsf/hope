@@ -18,13 +18,13 @@
 
 package io.github.madethoughts.hope.network;
 
+import io.github.madethoughts.hope.network.handler.HandshakeHandler;
+import io.github.madethoughts.hope.network.handler.LoginHandler;
+import io.github.madethoughts.hope.network.handler.PacketHandler;
+import io.github.madethoughts.hope.network.handler.StatusHandler;
 import io.github.madethoughts.hope.network.packets.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
-import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
-import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
-import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
 import java.io.IOException;
 import java.util.logging.Logger;
@@ -34,10 +34,17 @@ public final class PacketReceiver {
     private static final Logger log = Logger.getLogger(PacketReceiver.class.getName());
 
     private final Connection connection;
-    private final ResizableByteBuffer buffer = new ResizableByteBuffer();
+    private final ResizableByteBuffer buffer = ResizableByteBuffer.allocateDirect();
+
+    private final PacketHandler<Handshake> handshakeHandler;
+    private final PacketHandler<ServerboundPacket.StatusPacket> statusHandler;
+    private final PacketHandler<ServerboundPacket.LoginPacket> loginHandler;
 
     public PacketReceiver(Connection connection) {
         this.connection = connection;
+        handshakeHandler = new HandshakeHandler(connection);
+        statusHandler = new StatusHandler(connection);
+        loginHandler = new LoginHandler(connection);
     }
 
     public void listen() {
@@ -46,6 +53,12 @@ public final class PacketReceiver {
             var neededBytes = 0;
             while (channel.isOpen() && channel.read(buffer.nioBuffer()) != -1) {
                 if (buffer.position() < neededBytes) continue;
+
+                var decryptor = connection.decryptor();
+                if (decryptor != null) {
+                    buffer.flip();
+                    decryptor.update(buffer.nioBuffer());
+                }
 
                 neededBytes = deserializeAndHandle();
 
@@ -67,11 +80,10 @@ public final class PacketReceiver {
                         throw new IllegalStateException("Packetnknown %s: %s".formatted(ustate, id));
                 case DeserializerResult.PacketDeserialized(var packet) -> {
                     log.info("Got packet: %s".formatted(packet));
-                    switch (state) {
-                        case HANDSHAKE -> connection.state(((Handshake) packet).nextState());
-                        case STATUS -> handleStatus(packet);
-                        case LOGIN -> throw new UnsupportedOperationException("todo login"); // TODO: 2/24/23
-                        case PLAY -> throw new UnsupportedOperationException("todo play"); // TODO: 2/24/23
+                    switch (packet) {
+                        case Handshake handshake -> handshakeHandler.handle(handshake);
+                        case ServerboundPacket.StatusPacket statusPacket -> statusHandler.handle(statusPacket);
+                        case ServerboundPacket.LoginPacket loginPacket -> loginHandler.handle(loginPacket);
                     }
                     // try to deserialize left bytes
                     continue;
@@ -89,29 +101,6 @@ public final class PacketReceiver {
                 }
             }
             return 1;
-        }
-    }
-
-    private void handleStatus(ServerboundPacket packet) {
-        try {
-            switch (packet) {
-                // TODO: 2/24/23 add real values and config here
-                case StatusRequest() -> connection.queuePacket(new StatusResponse(
-                        new StatusResponse.Version("1.19.3", 761),
-                        new StatusResponse.Players(
-                                10,
-                                0
-                        ),
-                        "test hahah",
-                        new byte[0],
-                        false,
-                        false
-                ));
-                case PingRequest(var payload) -> connection.queuePacket(new PingResponse(payload));
-                case default -> throw new IllegalStateException("wrong status packet: %s".formatted(packet));
-            }
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
         }
     }
 }

@@ -16,23 +16,26 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets.serverbound.handshake;
+package io.github.madethoughts.hope.network.packets.serverbound.login;
 
-import io.github.madethoughts.hope.network.State;
+import io.github.madethoughts.hope.network.McCipher;
 import io.github.madethoughts.hope.network.packets.Deserializer;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
-public record Handshake(
-        int protocolNumber,
-        String serverAddress,
-        int serverPort,
-        State nextState
-) implements ServerboundPacket.HandshakePacket {
-
-    public static final Deserializer<Handshake> DESERIALIZER = buffer -> new Handshake(
-            buffer.readVarInt(),
-            buffer.readString(255),
-            buffer.readUShort(),
-            State.deserialize(buffer, State.STATUS, State.LOGIN)
+public record EncryptionResponse(
+        byte[] sharedSecretValue,
+        byte[] verifyToken
+) implements ServerboundPacket.LoginPacket {
+    public static final Deserializer<EncryptionResponse> DESERIALIZER = buffer -> new EncryptionResponse(
+            buffer.readArray(buffer.readVarInt()),
+            buffer.readArray(buffer.readVarInt())
     );
+
+    public byte[] decryptedSharedValue() {
+        return McCipher.decryptBytes(McCipher.serverKey.getPrivate(), sharedSecretValue);
+    }
+
+    public byte[] decryptedVerifyToken() {
+        return McCipher.decryptBytes(McCipher.serverKey.getPrivate(), verifyToken);
+    }
 }

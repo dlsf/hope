@@ -21,6 +21,8 @@ package io.github.madethoughts.hope.network.packets;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
+import io.github.madethoughts.hope.network.packets.serverbound.login.EncryptionResponse;
+import io.github.madethoughts.hope.network.packets.serverbound.login.LoginStart;
 import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
@@ -28,7 +30,10 @@ public enum Packets {
     HANDSHAKE(State.HANDSHAKE, 0x0, Handshake.DESERIALIZER),
 
     STATUS_REQUEST(State.STATUS, 0x0, __ -> new StatusRequest()),
-    PING_REQUEST(State.STATUS, 0x1, PingRequest.DESERIALIZER);
+    PING_REQUEST(State.STATUS, 0x1, PingRequest.DESERIALIZER),
+
+    LOGIN_START(State.LOGIN, 0x0, LoginStart.DESERIALIZER),
+    ENCRYPTION_RESPONSE(State.LOGIN, 0x1, EncryptionResponse.DESERIALIZER);
     // bypass copying array each time
     private static final Packets[] VALUES = values();
 
@@ -42,6 +47,17 @@ public enum Packets {
         this.deserializer = deserializer;
     }
 
+    /**
+     Tries to deserialize bytes into a packet by a given state and id.
+
+     @param state the current protocol state
+     @param id    the packet's id
+     @param data  the packet's data, it should be enough bytes for the packet to get deserialized. No size
+     checks are made.
+     @return {@link DeserializerResult.PacketDeserialized} if the packet got deserialized successful
+     or {@link DeserializerResult.UnknownPacket} if the packet is unknown
+     @throws ResizableByteBuffer.TypeDeserializationException if some error occurred while deserialization
+     */
     public static DeserializerResult tryDeserialize(State state, int id, ResizableByteBuffer data) {
         for (var value : VALUES) {
             if (value.state == state && value.id == id) {

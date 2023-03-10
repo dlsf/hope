@@ -35,8 +35,7 @@ public class PacketSender {
 
     private final ByteBuffer lengthBuffer = ByteBuffer.allocate(5);
 
-    // enough capacity to send list ping response without resizing
-    private final ResizableByteBuffer buffer = new ResizableByteBuffer();
+   private final ResizableByteBuffer buffer = ResizableByteBuffer.allocateDirect();
 
     public PacketSender(Connection connection) {
         this.connection = connection;
@@ -50,9 +49,19 @@ public class PacketSender {
                 var packet = packetQueue.take();
                 deserialize(packet);
 
+                var encryptor = connection.encryptor();
+                if (encryptor != null) {
+                    lengthBuffer.flip();
+                    encryptor.update(lengthBuffer);
+                    buffer.flip();
+                    encryptor.update(buffer.nioBuffer());
+                }
+
                 channel.write(lengthBuffer.flip());
                 channel.write(buffer.nioBuffer().flip());
-                log.info("Send %s to %s".formatted(packet, channel.getRemoteAddress()));
+                log.info("Send %s to %s || Encrypted: %s".formatted(packet, channel.getRemoteAddress(),
+                        connection.encryptor() != null
+                ));
 
                 if (connection.state() == State.STATUS && packet instanceof PingResponse) {
                     channel.shutdownInput();

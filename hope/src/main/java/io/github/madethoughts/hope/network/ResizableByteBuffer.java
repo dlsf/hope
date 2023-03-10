@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.OptionalInt;
+import java.util.UUID;
 
 public class ResizableByteBuffer {
     public static final int START_CAPACITY = 1028;
@@ -32,7 +33,19 @@ public class ResizableByteBuffer {
     public static final Charset CHARSET = StandardCharsets.UTF_8;
     private static final int VARINT_SEGMENT = 0x7F;
     private static final int VARINT_CONTINUE = 0x80;
-    private ByteBuffer buffer = ByteBuffer.allocateDirect(START_CAPACITY);
+    private ByteBuffer buffer;
+
+    private ResizableByteBuffer(ByteBuffer start) {
+        this.buffer = start;
+    }
+
+    public static ResizableByteBuffer allocateDirect() {
+        return new ResizableByteBuffer(ByteBuffer.allocateDirect(START_CAPACITY));
+    }
+
+    public static ResizableByteBuffer allocate() {
+        return new ResizableByteBuffer(ByteBuffer.allocate(START_CAPACITY));
+    }
 
     // we have to write the length varints in ByteBuffers direct, so this is a util here
     public static void writeVarInt(ByteBuffer buffer, int value) {
@@ -62,11 +75,11 @@ public class ResizableByteBuffer {
         if (size < 1) throw new IllegalArgumentException("Size must be positive.");
         var growSize = Integer.highestOneBit(size) * 2;
         if (growSize < 0 || growSize > MAX_CAPACITY) throw new IllegalArgumentException("Size is too big.");
-        buffer = ByteBuffer.allocateDirect(growSize)
-                           .put(buffer.flip());
+        buffer = (buffer.isDirect() ? ByteBuffer.allocateDirect(growSize) : ByteBuffer.allocate(growSize))
+                .put(buffer.flip());
     }
 
-    public void writeOp(Runnable runnable) {
+    private void writeOp(Runnable runnable) {
         while (true) {
             buffer.mark();
             try {
@@ -115,8 +128,9 @@ public class ResizableByteBuffer {
         return bytes;
     }
 
-    public String readString() {
+    public String readString(int maxSize) {
         var size = readVarInt();
+        if (size > maxSize * 4 || maxSize > 32767) throwSerdeException("String is too big");
         var bytes = readArray(size);
         return new String(bytes, CHARSET);
     }
@@ -173,6 +187,27 @@ public class ResizableByteBuffer {
 
     public int limit() {
         return buffer.limit();
+    }
+
+    public boolean readBoolean() {
+        return buffer.get() != 0;
+    }
+
+    public UUID readUUID() {
+        return new UUID(readLong(), readLong());
+    }
+
+    public void writeUUID(UUID uuid) {
+        writeLong(uuid.getLeastSignificantBits());
+        writeLong(uuid.getMostSignificantBits());
+    }
+
+    public void writeBoolean(boolean val) {
+        writeByte((byte) (val ? 1 : 0));
+    }
+
+    public void writeByte(byte b) {
+        writeOp(() -> buffer.put(b));
     }
 
     public static final class TypeDeserializationException extends RuntimeException {
