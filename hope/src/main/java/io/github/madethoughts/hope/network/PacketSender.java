@@ -21,12 +21,12 @@ package io.github.madethoughts.hope.network;
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
 
-import java.io.IOException;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 
-public class PacketSender {
+public class PacketSender implements Runnable {
 
     private static final Logger log = Logger.getLogger(PacketSender.class.getName());
 
@@ -35,17 +35,21 @@ public class PacketSender {
 
     private final ByteBuffer lengthBuffer = ByteBuffer.allocate(5);
 
-   private final ResizableByteBuffer buffer = ResizableByteBuffer.allocateDirect();
+    private final ResizableByteBuffer buffer = ResizableByteBuffer.allocateDirect();
 
     public PacketSender(Connection connection) {
         this.connection = connection;
         packetQueue = connection.clientboundPackets();
     }
 
-    public void start() {
+    @Override
+    public void run() {
         var channel = connection.socketChannel();
-        while (channel.isOpen()) {
-            try {
+        SocketAddress address = null;
+        try (channel) {
+            address = channel.getRemoteAddress();
+
+            while (channel.isOpen()) {
                 var packet = packetQueue.take();
                 deserialize(packet);
 
@@ -59,6 +63,7 @@ public class PacketSender {
 
                 channel.write(lengthBuffer.flip());
                 channel.write(buffer.nioBuffer().flip());
+
                 log.info("Send %s to %s || Encrypted: %s".formatted(packet, channel.getRemoteAddress(),
                         connection.encryptor() != null
                 ));
@@ -66,12 +71,12 @@ public class PacketSender {
                 if (connection.state() == State.STATUS && packet instanceof PingResponse) {
                     channel.shutdownInput();
                 }
-
-            } catch (InterruptedException | IOException e) {
-                // TODO: 2/23/23 logging
-                throw new RuntimeException(e);
             }
+        } catch (InterruptedException ignored) { // likely to be thrown by PacketReceiver
+        } catch (Throwable e) {
+            log.info("Unexpected exception in PacketSender for %s: %s".formatted(address, e));
         }
+        log.info("Closed sender for %s".formatted(address));
     }
 
     private void deserialize(ClientboundPacket packet) {

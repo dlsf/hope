@@ -19,6 +19,7 @@
 package io.github.madethoughts.hope.network.packets.serverbound.login;
 
 import io.github.madethoughts.hope.network.McCipher;
+import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.packets.Deserializer;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
@@ -31,11 +32,11 @@ public record EncryptionResponse(
             buffer.readArray(buffer.readVarInt())
     );
 
-    public byte[] decryptedSharedValue() {
+    public byte[] decryptedSharedValue() throws NetworkingException {
         return McCipher.decryptBytes(McCipher.serverKey.getPrivate(), sharedSecretValue);
     }
 
-    public byte[] decryptedVerifyToken() {
+    public byte[] decryptedVerifyToken() throws NetworkingException {
         return McCipher.decryptBytes(McCipher.serverKey.getPrivate(), verifyToken);
     }
 }

@@ -31,7 +31,6 @@ import java.security.Key;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
-import java.util.concurrent.ThreadLocalRandom;
 
 @SuppressWarnings("PublicStaticArrayField")
 public final class McCipher {
@@ -49,34 +48,33 @@ public final class McCipher {
             serverKey = generator.generateKeyPair();
         } catch (NoSuchAlgorithmException e) {
             // should not occur
-            throw new RuntimeException(e);
+            throw new AssertionError(e);
         }
 
         verifyToken = new byte[4];
-        ThreadLocalRandom.current().nextBytes(verifyToken);
+        ByteBuffer.wrap(verifyToken).putInt(0xbabc0ded);
     }
 
     private final Cipher cipher;
 
-    public McCipher(Key key, byte[] iv, int mode) throws InvalidAlgorithmParameterException, InvalidKeyException {
+    public McCipher(Key key, byte[] iv, int mode) throws NetworkingException {
         try {
             cipher = Cipher.getInstance(ENCRYPTION);
             cipher.init(mode, key, new IvParameterSpec(iv));
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
-            // should never occur
-            throw new AssertionError(e);
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidAlgorithmParameterException |
+                 InvalidKeyException e) {
+            throw new NetworkingException(e);
         }
     }
 
-    public static byte[] decryptBytes(Key key, byte[] encrypted) {
+    public static byte[] decryptBytes(Key key, byte[] encrypted) throws NetworkingException {
         try {
             var cipher = Cipher.getInstance(key.getAlgorithm());
             cipher.init(Cipher.DECRYPT_MODE, key);
             return cipher.doFinal(encrypted);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | IllegalBlockSizeException |
                  BadPaddingException e) {
-            // TODO: 3/10/23 logging
-            throw new RuntimeException(e);
+            throw new NetworkingException(e);
         }
     }
 

@@ -19,6 +19,7 @@
 package io.github.madethoughts.hope.network.handler;
 
 import io.github.madethoughts.hope.network.Connection;
+import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
 import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
@@ -31,25 +32,21 @@ public class StatusHandler implements PacketHandler<ServerboundPacket.StatusPack
     public StatusHandler(Connection connection) {this.connection = connection;}
 
     @Override
-    public void handle(ServerboundPacket.StatusPacket packet) {
-        try {
-            connection.queuePacket(switch (packet) {
-                // TODO: 2/24/23 add real values and config here
-                case StatusRequest() -> new StatusResponse(
-                        new StatusResponse.Version("1.19.3", 761),
-                        new StatusResponse.Players(
-                                10,
-                                0
-                        ),
-                        "test hahah",
-                        new byte[0],
-                        false,
-                        false
-                );
-                case PingRequest(var payload) -> new PingResponse(payload);
-            });
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+    public void handle(ServerboundPacket.StatusPacket packet) throws NetworkingException {
+        connection.queuePacket(switch (packet) {
+            // TODO: 2/24/23 add real values and config here
+            case StatusRequest() -> new StatusResponse(
+                    new StatusResponse.Version("1.19.3", 761),
+                    new StatusResponse.Players(
+                            10,
+                            0
+                    ),
+                    "test hahah",
+                    new byte[0],
+                    false,
+                    false
+            );
+            case PingRequest(var payload) -> new PingResponse(payload);
+        });
     }
 }

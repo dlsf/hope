@@ -26,10 +26,11 @@ import io.github.madethoughts.hope.network.packets.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 
-import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.channels.AsynchronousCloseException;
 import java.util.logging.Logger;
 
-public final class PacketReceiver {
+public final class PacketReceiver implements Runnable {
 
     private static final Logger log = Logger.getLogger(PacketReceiver.class.getName());
 
@@ -40,16 +41,23 @@ public final class PacketReceiver {
     private final PacketHandler<ServerboundPacket.StatusPacket> statusHandler;
     private final PacketHandler<ServerboundPacket.LoginPacket> loginHandler;
 
-    public PacketReceiver(Connection connection) {
+    private final Thread senderThread;
+
+    public PacketReceiver(Connection connection, Thread senderThread) {
         this.connection = connection;
         handshakeHandler = new HandshakeHandler(connection);
         statusHandler = new StatusHandler(connection);
         loginHandler = new LoginHandler(connection);
+        this.senderThread = senderThread;
     }
 
-    public void listen() {
+    @Override
+    public void run() {
         var channel = connection.socketChannel();
+        SocketAddress address = null;
         try (channel) {
+            address = channel.getRemoteAddress();
+
             var neededBytes = 0;
             while (channel.isOpen() && channel.read(buffer.nioBuffer()) != -1) {
                 if (buffer.position() < neededBytes) continue;
@@ -64,20 +72,24 @@ public final class PacketReceiver {
 
                 buffer.ensureCapacity(neededBytes);
             }
+
+            // interrupt sender thread to stop blocking for incoming packets
+            senderThread.interrupt();
+
             log.info("Disconnected %s".formatted(channel.getRemoteAddress()));
-        } catch (IOException e) {
-            // TODO: 2/9/23 logging
-            throw new RuntimeException(e);
+        } catch (AsynchronousCloseException ignored) {
+        } catch (Throwable e) {
+            log.info("Unexpected exception in PacketReceiver for %s: %s".formatted(address, e));
         }
+        log.info("Closed receiver for %s".formatted(address));
     }
 
-    private int deserializeAndHandle() {
+    private int deserializeAndHandle() throws NetworkingException {
         while (true) {
-            var state = connection.state();
             buffer.flip();
-            switch (ServerboundPacket.tryDeserialize(state, buffer)) {
+            switch (ServerboundPacket.tryDeserialize(connection.state(), buffer)) {
                 case DeserializerResult.UnknownPacket(var ustate, var id) ->
-                        throw new IllegalStateException("Packetnknown %s: %s".formatted(ustate, id));
+                        throw new UnsupportedOperationException("unknown packet %s: %s".formatted(ustate, id));
                 case DeserializerResult.PacketDeserialized(var packet) -> {
                     log.info("Got packet: %s".formatted(packet));
                     switch (packet) {
@@ -95,9 +107,6 @@ public final class PacketReceiver {
                     buffer.position(pos);
 
                     return size;
-                }
-                case DeserializerResult.Failed failed -> {
-                    log.info("failed: %s".formatted(failed.reason()));
                 }
             }
             return 1;

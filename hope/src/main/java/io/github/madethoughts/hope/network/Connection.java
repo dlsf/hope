@@ -54,8 +54,12 @@ public class Connection {
         return clientboundPackets;
     }
 
-    public void queuePacket(ClientboundPacket packet) throws InterruptedException {
-        clientboundPackets.put(packet);
+    public void queuePacket(ClientboundPacket packet) throws NetworkingException {
+        try {
+            clientboundPackets.put(packet);
+        } catch (InterruptedException e) {
+            throw new NetworkingException(e);
+        }
     }
 
     public McCipher decryptor() {

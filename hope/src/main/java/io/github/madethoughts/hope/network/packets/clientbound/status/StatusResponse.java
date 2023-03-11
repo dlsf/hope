@@ -58,7 +58,6 @@ public record StatusResponse(
         buffer.writeString(json.toString());
     }
 
-
     @Override
     public int id() {
         return 0;

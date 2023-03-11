@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.OptionalInt;
 import java.util.UUID;
 
-public class ResizableByteBuffer {
+public final class ResizableByteBuffer {
     public static final int START_CAPACITY = 1028;
     // 2 mebibyte
     public static final int MAX_CAPACITY = 2097152;
@@ -41,10 +41,6 @@ public class ResizableByteBuffer {
 
     public static ResizableByteBuffer allocateDirect() {
         return new ResizableByteBuffer(ByteBuffer.allocateDirect(START_CAPACITY));
-    }
-
-    public static ResizableByteBuffer allocate() {
-        return new ResizableByteBuffer(ByteBuffer.allocate(START_CAPACITY));
     }
 
     // we have to write the length varints in ByteBuffers direct, so this is a util here
@@ -200,10 +196,6 @@ public class ResizableByteBuffer {
     public void writeUUID(UUID uuid) {
         writeLong(uuid.getLeastSignificantBits());
         writeLong(uuid.getMostSignificantBits());
-    }
-
-    public void writeBoolean(boolean val) {
-        writeByte((byte) (val ? 1 : 0));
     }
 
     public void writeByte(byte b) {

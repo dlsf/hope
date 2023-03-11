@@ -71,12 +71,13 @@ public final class Gatekeeper implements AutoCloseable {
                 var connection = new Connection(clientChannel, State.HANDSHAKE);
                 connections.put(remoteAddress, connection);
 
-                Thread.startVirtualThread(() -> new PacketReceiver(connection).listen())
+                var sender = Thread.startVirtualThread(new PacketSender(connection));
+                sender.setName("Sender for %s".formatted(remoteAddress));
+                Thread.startVirtualThread(new PacketReceiver(connection, sender))
                       .setName("Listener for %s".formatted(remoteAddress));
-                Thread.startVirtualThread(() -> new PacketSender(connection).start())
-                      .setName("Sender for %s".formatted(remoteAddress));
             } catch (IOException e) {
                 // TODO: 2/9/23 logging
+                // TODO: 3/11/23 should shutdown server
                 throw new RuntimeException(e);
             }
 

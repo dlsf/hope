@@ -16,12 +16,4 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.handler;
-
-import io.github.madethoughts.hope.network.NetworkingException;
-import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
-
-@FunctionalInterface
-public interface PacketHandler<T extends ServerboundPacket> {
-    void handle(T packet) throws NetworkingException;
-}
+package io.github.madethoughts.hope.network.packets.clientbound.status;

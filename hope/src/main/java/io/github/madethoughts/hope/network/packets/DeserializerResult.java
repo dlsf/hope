@@ -41,9 +41,4 @@ public sealed interface DeserializerResult {
      @param id the if of the unknown packet
      */
     record UnknownPacket(State state, int id) implements DeserializerResult {}
-
-    /**
-     @param reason why the deserialization failed
-     */
-    record Failed(String reason) implements DeserializerResult {}
 }

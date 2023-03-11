@@ -18,6 +18,7 @@
 
 package io.github.madethoughts.hope.network.packets.serverbound;
 
+import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.DeserializerResult;
@@ -41,7 +42,7 @@ public sealed interface ServerboundPacket {
      @param buffer the buffer holding the bytes
      @return the result of the deserialization using {@link DeserializerResult}
      */
-    static DeserializerResult tryDeserialize(State state, ResizableByteBuffer buffer) {
+    static DeserializerResult tryDeserialize(State state, ResizableByteBuffer buffer) throws NetworkingException {
         try {
             var lengthOpt = buffer.tryReadVarInt();
             if (lengthOpt.isEmpty()) {
@@ -58,7 +59,7 @@ public sealed interface ServerboundPacket {
             buffer.compact();
             return deserialized;
         } catch (ResizableByteBuffer.TypeDeserializationException e) {
-            return new DeserializerResult.Failed(e.getMessage());
+            throw new NetworkingException(e);
         }
     }
 

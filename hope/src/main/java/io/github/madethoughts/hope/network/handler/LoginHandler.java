@@ -20,6 +20,7 @@ package io.github.madethoughts.hope.network.handler;
 
 import io.github.madethoughts.hope.network.Connection;
 import io.github.madethoughts.hope.network.McCipher;
+import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.State;
 import io.github.madethoughts.hope.network.packets.clientbound.login.EncryptionRequest;
 import io.github.madethoughts.hope.network.packets.clientbound.login.LoginSuccess;
@@ -37,8 +38,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -51,26 +50,19 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
             "https://sessionserver.mojang.com/session/minecraft/hasJoined?username=%s&serverId=%s";
 
     private final Connection connection;
-    private LoginStart loginStart;
+    private LoginStart loginStart = null;
 
     public LoginHandler(Connection connection) {this.connection = connection;}
 
     @Override
-    public void handle(ServerboundPacket.LoginPacket packet) {
-        try {
-            switch (packet) {
-                case LoginStart start -> handleLoginStart(start);
-                case EncryptionResponse response -> handleEncryptionResponse(response);
-            }
-        } catch (InvalidAlgorithmParameterException | NoSuchAlgorithmException | IOException | InvalidKeyException |
-                 InterruptedException e) {
-            throw new RuntimeException(e);
+    public void handle(ServerboundPacket.LoginPacket packet) throws NetworkingException {
+        switch (packet) {
+            case LoginStart start -> handleLoginStart(start);
+            case EncryptionResponse response -> handleEncryptionResponse(response);
         }
     }
 
-    private void handleEncryptionResponse(EncryptionResponse packet)
-            throws InvalidAlgorithmParameterException, InvalidKeyException, NoSuchAlgorithmException, IOException,
-            InterruptedException {
+    private void handleEncryptionResponse(EncryptionResponse packet) throws NetworkingException {
         var verifyToken = packet.decryptedVerifyToken();
 
         if (!Arrays.equals(verifyToken, McCipher.verifyToken)) {
@@ -90,7 +82,7 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
         connection.state(State.PLAY);
     }
 
-    private void handleLoginStart(LoginStart packet) throws InterruptedException {
+    private void handleLoginStart(LoginStart packet) throws NetworkingException {
         loginStart = packet;
         connection.queuePacket(new EncryptionRequest(
                 McCipher.serverKey.getPublic().getEncoded(),
@@ -98,22 +90,23 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
         ));
     }
 
-    private PlayerProfile sendJoinedRequest(byte[] sharedSecret)
-            throws NoSuchAlgorithmException, IOException, InterruptedException {
+    private PlayerProfile sendJoinedRequest(byte[] sharedSecret) throws NetworkingException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            digest.update(EncryptionRequest.SERVER_ID.getBytes(StandardCharsets.US_ASCII));
+            digest.update(sharedSecret);
+            digest.update(McCipher.serverKey.getPublic().getEncoded());
+            var hash = new BigInteger(digest.digest()).toString(16);
 
-        // compute hash
-        var digest = MessageDigest.getInstance("SHA-1");
-        digest.update(EncryptionRequest.SERVER_ID.getBytes(StandardCharsets.US_ASCII));
-        digest.update(sharedSecret);
-        digest.update(McCipher.serverKey.getPublic().getEncoded());
-        var hash = new BigInteger(digest.digest()).toString(16);
+            var request = HttpRequest.newBuilder()
+                                     .GET()
+                                     .uri(URI.create(MOJANG_HASJOINED_URL.formatted(loginStart.playerName(), hash)))
+                                     .build();
 
-        var request = HttpRequest.newBuilder()
-                                 .GET()
-                                 .uri(URI.create(MOJANG_HASJOINED_URL.formatted(loginStart.playerName(), hash)))
-                                 .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        return PlayerProfile.fromJson(response.body());
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            return PlayerProfile.fromJson(response.body());
+        } catch (NoSuchAlgorithmException | InterruptedException | IOException e) {
+            throw new NetworkingException(e);
+        }
     }
 }
