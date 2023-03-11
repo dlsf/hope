@@ -21,26 +21,26 @@ package io.github.madethoughts.hope.network.packets.serverbound;
 import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
-import io.github.madethoughts.hope.network.packets.DeserializerResult;
-import io.github.madethoughts.hope.network.packets.Packets;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 import io.github.madethoughts.hope.network.packets.serverbound.login.EncryptionResponse;
 import io.github.madethoughts.hope.network.packets.serverbound.login.LoginStart;
 import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
+/**
+ * Indicated that a packet is server bound and needs to be registered in {@link Packets}
+ */
 public sealed interface ServerboundPacket {
 
     DeserializerResult.MoreBytesNeeded NEED_SOME_BYTES = new DeserializerResult.MoreBytesNeeded(1);
 
     /**
-     Tries to deserialize a packet from bytes, including reading size und making size checks.
-     The used {@link ResizableByteBuffer}'s position will be enhanced by the bytes read amount.
-
-     @param state  the client's current sta
-     te
-     @param buffer the buffer holding the bytes
-     @return the result of the deserialization using {@link DeserializerResult}
+     * Tries to deserialize a packet from bytes, including reading size und making size checks.
+     * The used {@link ResizableByteBuffer}'s position will be enhanced by the bytes read amount.
+     *
+     * @param state  the client's current state
+     * @param buffer the buffer holding the bytes
+     * @return the result of the deserialization using {@link DeserializerResult}
      */
     static DeserializerResult tryDeserialize(State state, ResizableByteBuffer buffer) throws NetworkingException {
         try {

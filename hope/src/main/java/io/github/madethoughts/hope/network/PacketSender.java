@@ -23,9 +23,17 @@ import io.github.madethoughts.hope.network.packets.clientbound.status.PingRespon
 
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 
+/**
+ * This class is responsible for serializing and sending packets waiting in the {@link Connection#clientboundPackets()}
+ * queue.
+ * The sender supports encryption but no compression.
+ * If any exception is thrown while serializing or sending, the sender stops listening for new packets in the queue
+ * and closes the underlying {@link SocketChannel}, which will cause the {@link PacketReceiver} to stop.
+ */
 public class PacketSender implements Runnable {
 
     private static final Logger log = Logger.getLogger(PacketSender.class.getName());
@@ -46,6 +54,7 @@ public class PacketSender implements Runnable {
     public void run() {
         var channel = connection.socketChannel();
         SocketAddress address = null;
+
         try (channel) {
             address = channel.getRemoteAddress();
 
@@ -68,6 +77,7 @@ public class PacketSender implements Runnable {
                         connection.encryptor() != null
                 ));
 
+                // closing connection when PingResponse is sent
                 if (connection.state() == State.STATUS && packet instanceof PingResponse) {
                     channel.shutdownInput();
                 }

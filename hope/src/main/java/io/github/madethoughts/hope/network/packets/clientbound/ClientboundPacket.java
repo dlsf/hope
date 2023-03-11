@@ -24,6 +24,9 @@ import io.github.madethoughts.hope.network.packets.clientbound.login.LoginSucces
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
 import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
 
+/**
+ * Indicated that a packet is client bound and is serializable.
+ */
 public sealed interface ClientboundPacket
         permits EncryptionRequest, LoginSuccess, PingResponse, StatusResponse {
 

@@ -20,7 +20,7 @@ package io.github.madethoughts.hope.network.packets.serverbound.login;
 
 import io.github.madethoughts.hope.network.McCipher;
 import io.github.madethoughts.hope.network.NetworkingException;
-import io.github.madethoughts.hope.network.packets.Deserializer;
+import io.github.madethoughts.hope.network.packets.serverbound.Deserializer;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 public record EncryptionResponse(

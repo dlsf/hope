@@ -16,7 +16,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets;
+package io.github.madethoughts.hope.network.packets.serverbound;
 
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
@@ -26,6 +26,9 @@ import io.github.madethoughts.hope.network.packets.serverbound.login.LoginStart;
 import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
+/**
+ * List of all server bound packets, used to deserialize them.
+ */
 public enum Packets {
     HANDSHAKE(State.HANDSHAKE, 0x0, Handshake.DESERIALIZER),
 
@@ -48,15 +51,15 @@ public enum Packets {
     }
 
     /**
-     Tries to deserialize bytes into a packet by a given state and id.
-
-     @param state the current protocol state
-     @param id    the packet's id
-     @param data  the packet's data, it should be enough bytes for the packet to get deserialized. No size
-     checks are made.
-     @return {@link DeserializerResult.PacketDeserialized} if the packet got deserialized successful
-     or {@link DeserializerResult.UnknownPacket} if the packet is unknown
-     @throws ResizableByteBuffer.TypeDeserializationException if some error occurred while deserialization
+     * Tries to deserialize bytes into a packet by a given state and id.
+     *
+     * @param state the current protocol state
+     * @param id    the packet's id
+     * @param data  the packet's data, it should be enough bytes for the packet to get deserialized. No size
+     *              checks are made.
+     * @return {@link DeserializerResult.PacketDeserialized} if the packet got deserialized successful
+     * or {@link DeserializerResult.UnknownPacket} if the packet is unknown
+     * @throws ResizableByteBuffer.TypeDeserializationException if some error occurred while deserialization
      */
     public static DeserializerResult tryDeserialize(State state, int id, ResizableByteBuffer data) {
         for (var value : VALUES) {

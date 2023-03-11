@@ -17,7 +17,8 @@
  */
 
 /**
- Includes packets that are server bound
+ * Includes packets that are server bound and the deserialization logic for them.
+ * All packet are names mostly equal to their names on wiki.vg.
  */
 
 package io.github.madethoughts.hope.network.packets.serverbound;

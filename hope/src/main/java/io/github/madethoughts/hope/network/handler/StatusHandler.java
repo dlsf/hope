@@ -26,6 +26,9 @@ import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket
 import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
 
+/**
+ * This class is responsible for handling status packets, including sending ping and status responses.
+ */
 public class StatusHandler implements PacketHandler<ServerboundPacket.StatusPacket> {
     private final Connection connection;
 

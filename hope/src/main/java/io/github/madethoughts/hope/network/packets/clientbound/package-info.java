@@ -16,4 +16,9 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+/**
+ * Contains client bound packets and their serializer.
+ * All packet are names mostly equal to their names on wiki.vg.
+ */
+
 package io.github.madethoughts.hope.network.packets.clientbound;

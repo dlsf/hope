@@ -22,14 +22,24 @@ import io.github.madethoughts.hope.network.handler.HandshakeHandler;
 import io.github.madethoughts.hope.network.handler.LoginHandler;
 import io.github.madethoughts.hope.network.handler.PacketHandler;
 import io.github.madethoughts.hope.network.handler.StatusHandler;
-import io.github.madethoughts.hope.network.packets.DeserializerResult;
+import io.github.madethoughts.hope.network.packets.serverbound.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 
 import java.net.SocketAddress;
 import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.SocketChannel;
 import java.util.logging.Logger;
 
+/**
+ * This class is responsible for receiving and handling packets send to the sender by a specific connection.
+ * All sorts of packets are handled by their corresponding {@link PacketHandler}. Note that {@link State#STATUS},
+ * {@link State#HANDSHAKE} and {@link State#LOGIN} are handled independent of the server's ticks.
+ * This receiver supports encrypted data, but no compressed packets.
+ * All exceptions thrown while handling (before passed to the game loop), {@link SocketChannel#close()} or an
+ * interrupt signal will cause this receiver to stop listening for data, interrupting the {@link PacketSender} threads
+ * and closing the underlying {@link SocketChannel}
+ */
 public final class PacketReceiver implements Runnable {
 
     private static final Logger log = Logger.getLogger(PacketReceiver.class.getName());
@@ -55,6 +65,7 @@ public final class PacketReceiver implements Runnable {
     public void run() {
         var channel = connection.socketChannel();
         SocketAddress address = null;
+
         try (channel) {
             address = channel.getRemoteAddress();
 
@@ -84,6 +95,12 @@ public final class PacketReceiver implements Runnable {
         log.info("Closed receiver for %s".formatted(address));
     }
 
+    /**
+     * Tries to deserialize all packets currently represented by the read bytes.
+     *
+     * @return the bytes needed for the current or next packet
+     * @throws NetworkingException if any checked exception was thrown
+     */
     private int deserializeAndHandle() throws NetworkingException {
         while (true) {
             buffer.flip();

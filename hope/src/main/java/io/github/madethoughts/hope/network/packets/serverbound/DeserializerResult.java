@@ -16,13 +16,28 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets;
+package io.github.madethoughts.hope.network.packets.serverbound;
 
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
-import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
+import io.github.madethoughts.hope.network.State;
 
-@FunctionalInterface
-public interface Deserializer<T extends ServerboundPacket> {
+/**
+ * Results of the {@link ServerboundPacket#tryDeserialize(State, ResizableByteBuffer)} method
+ */
+// all value classes
+public sealed interface DeserializerResult {
+    /**
+     * @param neededSize the amount of bytes this packet needs, including the header's length field
+     */
+    record MoreBytesNeeded(int neededSize) implements DeserializerResult {}
 
-    T tryDeserialize(ResizableByteBuffer buffer);
+    /**
+     * @param packet the deserialized packet
+     */
+    record PacketDeserialized(ServerboundPacket packet) implements DeserializerResult {}
+
+    /**
+     * @param id the if of the unknown packet
+     */
+    record UnknownPacket(State state, int id) implements DeserializerResult {}
 }

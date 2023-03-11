@@ -22,10 +22,22 @@ import org.json.JSONObject;
 
 import java.util.UUID;
 
+/**
+ * The player profile retunred by the mojang api.
+ *
+ * @param uuid the player's uuid
+ * @param name the player's name
+ */
 public record PlayerProfile(
         UUID uuid,
         String name
 ) {
+    /**
+     * Parses a new player profile from the json returned by the mojang api.
+     *
+     * @param json the json
+     * @return the player profile
+     */
     public static PlayerProfile fromJson(String json) {
         var jsonObject = new JSONObject(json);
         var uuid = uuidFromHex(jsonObject.getString("id"));
@@ -34,7 +46,13 @@ public record PlayerProfile(
         return new PlayerProfile(uuid, name);
     }
 
-    public static UUID uuidFromHex(String hex) {
+    /**
+     * Constructs an uuid from the mojang api's hex representation.
+     *
+     * @param hex the hex sent by mojang
+     * @return the UUID
+     */
+    private static UUID uuidFromHex(String hex) {
         // adjust uuid format
         var formattedUUID = hex.substring(0, 8) +
                             '-' +

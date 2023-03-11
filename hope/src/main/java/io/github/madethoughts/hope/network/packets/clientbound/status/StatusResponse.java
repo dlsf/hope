@@ -48,6 +48,7 @@ public record StatusResponse(
                         .put("online", players.online())
                         .put("sample", new JSONArray())
                 )
+                // TODO: 3/12/23 chat support
                 .put("description", new JSONObject()
                         .put("text", descriptionText())
                 )

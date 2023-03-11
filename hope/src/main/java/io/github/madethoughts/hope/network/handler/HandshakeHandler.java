@@ -21,6 +21,9 @@ package io.github.madethoughts.hope.network.handler;
 import io.github.madethoughts.hope.network.Connection;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 
+/**
+ * This class is responsible for handling the handshake packet.
+ */
 public class HandshakeHandler implements PacketHandler<Handshake> {
     private final Connection connection;
 

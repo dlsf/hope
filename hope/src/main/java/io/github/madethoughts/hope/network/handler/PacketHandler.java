@@ -21,6 +21,11 @@ package io.github.madethoughts.hope.network.handler;
 import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
+/**
+ * A marker interface for all packet handlers
+ *
+ * @param <T> The {@link ServerboundPacket} or category to be handled.
+ */
 @FunctionalInterface
 public interface PacketHandler<T extends ServerboundPacket> {
     void handle(T packet) throws NetworkingException;

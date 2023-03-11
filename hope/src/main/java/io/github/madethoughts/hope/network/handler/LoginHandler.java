@@ -42,6 +42,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 
+/**
+ * This class is responsible for handling login packets, including enabling encryption activation and authentication
+ * with mojang api.
+ */
 public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket> {
 
     public static final HttpClient httpClient = HttpClient.newHttpClient();
@@ -98,10 +102,11 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
             digest.update(McCipher.serverKey.getPublic().getEncoded());
             var hash = new BigInteger(digest.digest()).toString(16);
 
+            // TODO: 3/12/23 implement check for unauthenticated profiles
             var request = HttpRequest.newBuilder()
                                      .GET()
                                      .uri(URI.create(MOJANG_HASJOINED_URL.formatted(loginStart.playerName(), hash)))
-                                     .build();
+                    .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             return PlayerProfile.fromJson(response.body());

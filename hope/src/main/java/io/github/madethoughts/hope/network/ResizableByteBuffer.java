@@ -26,6 +26,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.OptionalInt;
 import java.util.UUID;
 
+/**
+ * A thread unsafe ByteBuffer that resizes its underlying nio ByteBuffer if needed.
+ * The capacity will always be a power of 2.
+ * Note: This implementation isn't really tested, use it at your own risk.
+ * All data types are implemented according to the minecraft protocol.
+ */
 public final class ResizableByteBuffer {
     public static final int START_CAPACITY = 1028;
     // 2 mebibyte
@@ -39,11 +45,21 @@ public final class ResizableByteBuffer {
         this.buffer = start;
     }
 
+    /**
+     * @return a new ResizeableByteBuffer that uses nio direct bytebuffers
+     */
     public static ResizableByteBuffer allocateDirect() {
         return new ResizableByteBuffer(ByteBuffer.allocateDirect(START_CAPACITY));
     }
 
     // we have to write the length varints in ByteBuffers direct, so this is a util here
+
+    /**
+     * Writes a varint to a bytebuffer.
+     *
+     * @param buffer the bytebuffer to be written
+     * @param value  the varint value
+     */
     public static void writeVarInt(ByteBuffer buffer, int value) {
         while (true) {
             if ((value & ~VARINT_SEGMENT) == 0) {
@@ -56,14 +72,29 @@ public final class ResizableByteBuffer {
         }
     }
 
+    /**
+     * Util method to throw a {@link TypeDeserializationException}
+     *
+     * @param message the message/reason of the exception
+     * @param <T>     just some generic, so it simulates to return something (will never, if always throws)
+     * @return the exception
+     */
     public static <T> T throwSerdeException(String message) {
         throw new TypeDeserializationException(message);
     }
 
-    public void grow() {
+    /**
+     * grows the buffer by doubling the capacity
+     */
+    private void grow() {
         ensureCapacity(buffer.capacity() * 2);
     }
 
+    /**
+     * Ensures that the buffer has the given size as a minimum.
+     *
+     * @param size the needed buffer size
+     */
     public void ensureCapacity(int size) {
         // we don't have to do anything
         if (buffer.capacity() > size) return;
@@ -75,6 +106,13 @@ public final class ResizableByteBuffer {
                 .put(buffer.flip());
     }
 
+    /**
+     * Tries to write something to the buffer if a {@link BufferOverflowException} occurs, the buffer get resized
+     * and the operation repeats.
+     * Note that this method must be never call itself.
+     *
+     * @param runnable the task
+     */
     private void writeOp(Runnable runnable) {
         while (true) {
             buffer.mark();
@@ -88,6 +126,23 @@ public final class ResizableByteBuffer {
         }
     }
 
+    /**
+     * Writes a varint to this buffer.
+     *
+     * @param val the int value to be written
+     * @see ResizableByteBuffer#writeVarInt(ByteBuffer, int)
+     */
+    public void writeVarInt(int val) {
+        writeOp(() -> writeVarInt(buffer, val));
+    }
+
+    /**
+     * Reads a varint from this buffer.
+     *
+     * @return the int value of this varint
+     * @throws BufferUnderflowException     if there are not enough bytes for a varint
+     * @throws TypeDeserializationException if the int is bigger than 32 bits
+     */
     public int readVarInt() {
         int value = 0;
         int position = 0;
@@ -104,6 +159,12 @@ public final class ResizableByteBuffer {
         return value;
     }
 
+    /**
+     * Tries to read a varint from this buffer.
+     * If it fails, the buffer will be reset to the previous state.
+     *
+     * @return an empty optional if no int could be read
+     */
     public OptionalInt tryReadVarInt() {
         buffer.mark();
         try {
@@ -114,16 +175,51 @@ public final class ResizableByteBuffer {
         }
     }
 
+    /**
+     * Writes a byte array to the buffer
+     *
+     * @param bytes the bytes to be written
+     */
     public void writeArray(byte[] bytes) {
         writeOp(() -> buffer.put(bytes));
     }
 
+    /**
+     * Reads a byte array from this buffer
+     *
+     * @param size the size of the byte array
+     * @return the read byte array
+     * @throws BufferUnderflowException if there aren't enough bytes
+     */
     public byte[] readArray(int size) {
         var bytes = new byte[size];
         buffer.get(bytes);
         return bytes;
     }
 
+    /**
+     * Writes a length prefixed string to this buffer
+     *
+     * @param val the string to be written
+     * @see ResizableByteBuffer#writeVarInt(int)
+     * @see ResizableByteBuffer#writeArray(byte[])
+     */
+    public void writeString(String val) {
+        var bytes = val.getBytes(CHARSET);
+        writeVarInt(bytes.length);
+        writeArray(bytes);
+    }
+
+    /**
+     * Reads a length prefixes string from this buffer
+     *
+     * @param maxSize the maximum amount of characters of this string. Must be less than 32767 and will only be
+     *                checked roughly: prefixLength > (maxsize * 4) -> error
+     * @return the read string
+     * @throws BufferUnderflowException     if there are not enough bytes
+     * @throws TypeDeserializationException if the string is too big or the varint read failed
+     * @see ResizableByteBuffer#readVarInt()
+     */
     public String readString(int maxSize) {
         var size = readVarInt();
         if (size > maxSize * 4 || maxSize > 32767) throwSerdeException("String is too big");
@@ -131,77 +227,149 @@ public final class ResizableByteBuffer {
         return new String(bytes, CHARSET);
     }
 
-    public void writeString(String val) {
-        var bytes = val.getBytes(CHARSET);
-        writeVarInt(bytes.length);
-        writeArray(bytes);
-    }
-
-    public void writeVarInt(int val) {
-        writeOp(() -> writeVarInt(buffer, val));
-    }
-
+    /**
+     * Reads an unsiged short from this buffer, represented as an int
+     *
+     * @return the integer value of this short
+     * @throws BufferUnderflowException if there aren't enough bytes
+     */
     public int readUShort() {
         return Short.toUnsignedInt(buffer.getShort());
     }
 
+    /**
+     * Reads a long from this buffer
+     *
+     * @return the long
+     * @throws BufferUnderflowException if there aren't enough bytes in this buffer
+     */
     public long readLong() {
         return buffer.getLong();
     }
+
+    /**
+     * Writes a long to this buffer
+     *
+     * @param val the long
+     */
 
     public void writeLong(long val) {
         writeOp(() -> buffer.putLong(val));
     }
 
-    public int position() {
-        return buffer.position();
-    }
-
-    public void position(int pos) {
-        buffer.position(pos);
-    }
-
-    public int remaining() {
-        return buffer.remaining();
-    }
-
-    public ByteBuffer nioBuffer() {
-        return buffer;
-    }
-
-    public void flip() {
-        buffer.flip();
-    }
-
-    public void clear() {
-        buffer.clear();
-    }
-
-    public void compact() {
-        buffer.compact();
-    }
-
-    public int limit() {
-        return buffer.limit();
-    }
-
+    /**
+     * Reads an on byte boolean value from this buffer. The boolean is true if the byte unequal zero
+     *
+     * @return the read boolean
+     */
     public boolean readBoolean() {
         return buffer.get() != 0;
     }
 
-    public UUID readUUID() {
-        return new UUID(readLong(), readLong());
-    }
+    /**
+     * writes an uuid to this byte buffer using two longs
+     *
+     * @param uuid the uuid to be written
+     * @see ResizableByteBuffer#writeLong(long)
+     */
 
     public void writeUUID(UUID uuid) {
         writeLong(uuid.getLeastSignificantBits());
         writeLong(uuid.getMostSignificantBits());
     }
 
-    public void writeByte(byte b) {
-        writeOp(() -> buffer.put(b));
+    /**
+     * reads an uuid from this buffer, that is stored in two longs
+     *
+     * @return the read uuid
+     * @see ResizableByteBuffer#readLong()
+     */
+    public UUID readUUID() {
+        return new UUID(readLong(), readLong());
     }
 
+    // -------------------------------------------------------------------
+
+    /**
+     * @return the buffer's current position.
+     * @see ByteBuffer#position()
+     */
+
+    public int position() {
+        return buffer.position();
+    }
+
+    /**
+     * Sets the buffer's current position.
+     *
+     * @param pos the position
+     * @see ByteBuffer#position(int)
+     */
+
+    public void position(int pos) {
+        buffer.position(pos);
+    }
+
+    /**
+     * @return the buffer's remaing space
+     * @see ByteBuffer#remaining()
+     */
+
+    public int remaining() {
+        return buffer.remaining();
+    }
+
+    /**
+     * @return the underlying nio {@link ByteBuffer}
+     */
+
+    public ByteBuffer nioBuffer() {
+        return buffer;
+    }
+
+    /**
+     * flips the buffer
+     *
+     * @see ByteBuffer#flip()
+     */
+    public void flip() {
+        buffer.flip();
+    }
+
+    /**
+     * clears the buffer
+     *
+     * @see ByteBuffer#clear()
+     */
+
+    public void clear() {
+        buffer.clear();
+    }
+
+    /**
+     * compacts this buffer
+     *
+     * @see ByteBuffer#clear()
+     */
+
+    public void compact() {
+        buffer.compact();
+    }
+
+    /**
+     * @return the buffer's limit
+     * @see ByteBuffer#limit()
+     */
+
+    public int limit() {
+        return buffer.limit();
+    }
+
+    /**
+     * An exception that indicated that something went wrong while reading/writing data from this buffer.
+     * Note that this is not thrown if the buffer has to few bytes, instead a {@link BufferUnderflowException} is
+     * used in this case.
+     */
     public static final class TypeDeserializationException extends RuntimeException {
         private TypeDeserializationException(String message) {
             super(message);

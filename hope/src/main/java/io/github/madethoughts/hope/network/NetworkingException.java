@@ -18,6 +18,9 @@
 
 package io.github.madethoughts.hope.network;
 
+/**
+ * A wrapper exception over all checked exceptions thrown while (de)serializing or handling packets.
+ */
 public class NetworkingException extends Exception {
     public NetworkingException(Exception underlying) {
         super(underlying);

@@ -25,6 +25,9 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+/**
+ * A pojo that hols some Connection information and contains some "utility" methods.
+ */
 public class Connection {
     private final SocketChannel socketChannel;
     private final BlockingQueue<ClientboundPacket> clientboundPackets = new LinkedBlockingQueue<>(6);

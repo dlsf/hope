@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 /**
- The programms main entry
+ * The programms main entry
  */
 public final class Application {
 

@@ -16,4 +16,12 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network.packets;
+package io.github.madethoughts.hope.network.packets.serverbound;
+
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
+
+@FunctionalInterface
+public interface Deserializer<T extends ServerboundPacket> {
+
+    T tryDeserialize(ResizableByteBuffer buffer);
+}

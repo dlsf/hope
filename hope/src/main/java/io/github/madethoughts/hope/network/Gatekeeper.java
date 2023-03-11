@@ -27,8 +27,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
- This pipelines waits for new clients to connect, reads/deserializes their packets and puts them in
- a queue to be taken by a receiver (the game loop)
+ * This gatekeeper waits for new clients to connect, reads/deserializes their packets and puts them in
+ * a queue to be taken by a receiver (the game loop)
+ *
+ * @see PacketReceiver
+ * @see PacketSender
  */
 public final class Gatekeeper implements AutoCloseable {
 
@@ -44,13 +47,13 @@ public final class Gatekeeper implements AutoCloseable {
     }
 
     /**
-     Constructs a new packet pipeline including a {@link ServerSocketChannel} and starts listening
-     for connections and packets.
-
-     @param address the address the socket is bound to
-     @return the Pipeline used to listen for packets
-     @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
-     @throws RuntimeException some exception from one of the virtual threads
+     * Constructs a new packet pipeline including a {@link ServerSocketChannel} and starts listening
+     * for connections and packets.
+     *
+     * @param address the address the socket is bound to
+     * @return the Pipeline used to listen for packets
+     * @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
+     * @throws RuntimeException some exception from one of the virtual threads
      */
     public static Gatekeeper openAndListen(SocketAddress address) throws IOException {
         var channel = ServerSocketChannel.open();
@@ -73,6 +76,7 @@ public final class Gatekeeper implements AutoCloseable {
 
                 var sender = Thread.startVirtualThread(new PacketSender(connection));
                 sender.setName("Sender for %s".formatted(remoteAddress));
+
                 Thread.startVirtualThread(new PacketReceiver(connection, sender))
                       .setName("Listener for %s".formatted(remoteAddress));
             } catch (IOException e) {
@@ -85,13 +89,16 @@ public final class Gatekeeper implements AutoCloseable {
     }
 
     /**
-     @return the SocketAddress the socket is listening on
-     @throws IOException see {@link SocketChannel#getLocalAddress()}
+     * @return the SocketAddress the socket is listening on
+     * @throws IOException see {@link SocketChannel#getLocalAddress()}
      */
     public SocketAddress address() throws IOException {
         return socketChannel.getLocalAddress();
     }
 
+    /**
+     * @see SocketChannel#close()
+     */
     @Override
     public void close() throws IOException {
         socketChannel.close();

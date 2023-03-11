@@ -18,7 +18,7 @@
 
 package io.github.madethoughts.hope.network.packets.serverbound.status;
 
-import io.github.madethoughts.hope.network.packets.Deserializer;
+import io.github.madethoughts.hope.network.packets.serverbound.Deserializer;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 
 public record PingRequest(
