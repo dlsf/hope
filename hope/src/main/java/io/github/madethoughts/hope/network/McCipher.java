@@ -52,7 +52,7 @@ public final class McCipher {
         }
 
         verifyToken = new byte[4];
-        ByteBuffer.wrap(verifyToken).putInt(0xbabc0ded);
+        ByteBuffer.wrap(verifyToken).putInt(0xbadc0ded);
     }
 
     private final Cipher cipher;
