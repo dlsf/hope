@@ -7,13 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Setup JDK 18 used by gradle
+      - name: Setup JDK 19 used by gradle
         uses: actions/setup-java@v3
         with:
           distribution: temurin
-          java-version: 18
+          java-version: 19
       - uses: gradle/gradle-build-action@v2
       - name: Build with gradle
-        run: gradle build -x test
+        run: ./gradlew build -x test
       - name: Test with gradle
-        run: gradle test
+        run: ./gradlew test
