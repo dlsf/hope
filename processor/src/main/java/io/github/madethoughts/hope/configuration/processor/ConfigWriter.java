@@ -131,7 +131,7 @@ public final class ConfigWriter {
      */
     public JavaFile generate(Filer filer) throws IOException {
         var loadMethod = MethodSpec.methodBuilder("load")
-                                   .addModifiers(Modifier.PUBLIC)
+                                   .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
                                    .addParameter(TomlTable.class, "toml")
                                    .addStatement("this.$N = toml", tomlField);
 
