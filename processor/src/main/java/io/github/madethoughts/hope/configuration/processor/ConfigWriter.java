@@ -16,7 +16,7 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.processor.configuration;
+package io.github.madethoughts.hope.configuration.processor;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
@@ -42,25 +42,24 @@ import java.util.Map;
  */
 public final class ConfigWriter {
 
+    private final TomlTable defaultValues;
+
     private final FieldSpec tomlField;
-    private final FieldSpec defaultConfigField;
     private final TypeSpec.Builder typeSpecBuilder;
 
     private final Map<FieldSpec, JavaFile> innerConfigFields = new HashMap<>();
 
     private final PackageElement interfacePackage;
 
-    public ConfigWriter(TypeElement interfaceElement, Elements elements) {
+    public ConfigWriter(TomlTable defaultValues, TypeElement interfaceElement, Elements elements) {
+        this.defaultValues = defaultValues;
         this.interfacePackage = elements.getPackageOf(interfaceElement);
         this.tomlField = FieldSpec.builder(TomlTable.class, "toml", Modifier.PRIVATE)
                                   .build();
-        this.defaultConfigField = FieldSpec.builder(TomlTable.class, "defaultConfig", Modifier.PRIVATE)
-                                           .build();
         this.typeSpecBuilder = TypeSpec.classBuilder(interfaceElement.getSimpleName() + "$Implementation")
                                        .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                                        .addSuperinterface(interfaceElement.asType())
-                                       .addField(tomlField)
-                                       .addField(defaultConfigField);
+                                       .addField(tomlField);
     }
 
     /**
@@ -72,9 +71,9 @@ public final class ConfigWriter {
         var type = descriptor.kind();
 
         switch (type) {
-            case INTEGER -> addGetter(descriptor, "getLong", "longValue()");
-            case FLOAT -> addGetter(descriptor, "getDouble", "doubleValue()");
-            case STRING -> addGetter(descriptor, "getString", "toString()");
+            case INTEGER -> addGetter(descriptor, "getLong", "$L");
+            case FLOAT -> addGetter(descriptor, "getDouble", "$L");
+            case STRING -> addGetter(descriptor, "getString", "$S");
         }
     }
 
@@ -99,20 +98,25 @@ public final class ConfigWriter {
     /**
      * Adds a simple getter implementation for this specific method (PropertyDescriptor)
      *
-     * @param descriptor       the descriptor
-     * @param getterMethod     the name of the corresponding getter method in {@link TomlTable}
-     * @param conversionMethod the name of the method to convert to the actual value (unboxing etc). For example Long
-     *                         .longValue() or
-     *                         String.toString()
+     * @param descriptor   the descriptor
+     * @param getterMethod the name of the corresponding getter method in {@link TomlTable}
      */
-    private void addGetter(PropertyDescriptor descriptor, String getterMethod, String conversionMethod) {
+    private void addGetter(PropertyDescriptor descriptor, String getterMethod, String defaultPlaceholder) {
         var returnType = descriptor.method().getReturnType();
+        var name = descriptor.name();
+        var kind = descriptor.kind();
+
+        var defaultValue = defaultValues.get(name);
+        if (!kind.rightType(defaultValue)) {
+            throw new IllegalArgumentException("Default value is of wrong type. Excepted: %s, got: %s"
+                    .formatted(kind, TomlKind.forClass(defaultValue.getClass())));
+        }
+
         var method = MethodSpec.overriding(descriptor.method())
-                               .addStatement("return ($T) $N.$N($S, () -> ($T) $N.$N($S).$N)",
+                               .addStatement("return ($T) $N.$N($S, () -> %s)".formatted(defaultPlaceholder),
                                        returnType,
                                        tomlField, getterMethod,
-                                       descriptor.name(), returnType, defaultConfigField, getterMethod,
-                                       descriptor.name(), conversionMethod
+                                       name, defaultValues.get(name)
                                )
                                .build();
         typeSpecBuilder.addMethod(method);
@@ -129,9 +133,7 @@ public final class ConfigWriter {
         var loadMethod = MethodSpec.methodBuilder("load")
                                    .addModifiers(Modifier.PUBLIC)
                                    .addParameter(TomlTable.class, "toml")
-                                   .addParameter(TomlTable.class, "defaultConfig")
-                                   .addStatement("this.$N = toml", tomlField)
-                                   .addStatement("this.$N = defaultConfig", defaultConfigField);
+                                   .addStatement("this.$N = toml", tomlField);
 
         int i = 0;
         for (var entry : innerConfigFields.entrySet()) {
@@ -142,7 +144,7 @@ public final class ConfigWriter {
             var varName = "a%s".formatted(++i);
             loadMethod
                     .addStatement("var $N = new $T()", varName, ClassName.get(file.packageName, file.typeSpec.name))
-                    .addStatement("$N.load($N, $N)", varName, tomlField, defaultConfigField)
+                    .addStatement("$N.load($N)", varName, tomlField)
                     .addStatement("this.$N = $N", field, varName);
         }
 

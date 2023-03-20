@@ -16,10 +16,29 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.processor.configuration;
+package io.github.madethoughts.hope.configuration.processor;
+
+import java.util.Arrays;
 
 public enum TomlKind {
-    INTEGER,
-    FLOAT,
-    STRING
+    INTEGER(Long.class),
+    FLOAT(Double.class),
+    STRING(String.class);
+
+    private final Class<?> klass;
+
+    TomlKind(Class<?> klass) {
+        this.klass = klass;
+    }
+
+    public static TomlKind forClass(Class<?> klass) {
+        return Arrays.stream(values())
+                     .filter(value -> value.klass == klass)
+                     .findFirst()
+                     .orElse(null);
+    }
+
+    public boolean rightType(Object value) {
+        return klass.isInstance(value);
+    }
 }

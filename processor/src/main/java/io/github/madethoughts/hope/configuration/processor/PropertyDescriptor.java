@@ -16,4 +16,20 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.processor.configuration;
+package io.github.madethoughts.hope.configuration.processor;
+
+import javax.lang.model.element.ExecutableElement;
+
+/**
+ * Describes a config value connected with its method
+ *
+ * @param name   the full value name (key)
+ * @param method the interface method
+ * @param kind   the value's toml type
+ */
+public record PropertyDescriptor(
+        String name,
+        ExecutableElement method,
+        TomlKind kind
+) {
+}

@@ -16,20 +16,15 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.processor.configuration;
+package io.github.madethoughts.hope.configuration.processor;
 
-import javax.lang.model.element.ExecutableElement;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-/**
- * Describes a config value connected with its method
- *
- * @param name   the full value name (key)
- * @param method the interface method
- * @param kind   the value's toml type
- */
-public record PropertyDescriptor(
-        String name,
-        ExecutableElement method,
-        TomlKind kind
-) {
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface Configuration {
+    String value();
 }

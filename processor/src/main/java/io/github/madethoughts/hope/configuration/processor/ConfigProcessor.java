@@ -16,9 +16,11 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.processor.configuration;
+package io.github.madethoughts.hope.configuration.processor;
 
 import com.squareup.javapoet.JavaFile;
+import org.tomlj.Toml;
+import org.tomlj.TomlParseResult;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -27,6 +29,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
+import javax.lang.model.AnnotatedConstruct;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -36,7 +39,10 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import javax.tools.JavaFileManager;
+import javax.tools.StandardLocation;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,7 +54,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * in snake case before. All generated methods have a fallback to the default config that is passed to the
  * implementation.
  */
-@SupportedAnnotationTypes("io.github.madethoughts.hope.configuration.Configuration")
+@SupportedAnnotationTypes("io.github.madethoughts.hope.configuration.processor.Configuration")
 @SupportedSourceVersion(SourceVersion.RELEASE_19)
 public class ConfigProcessor extends AbstractProcessor {
 
@@ -76,25 +82,30 @@ public class ConfigProcessor extends AbstractProcessor {
     }
 
     @Override
-    public synchronized void init(ProcessingEnvironment processingEnv) {
-        this.messager = processingEnv.getMessager();
-        this.types = processingEnv.getTypeUtils();
-        this.elements = processingEnv.getElementUtils();
-        this.filer = processingEnv.getFiler();
+    public synchronized void init(ProcessingEnvironment env) {
+        this.messager = env.getMessager();
+        this.types = env.getTypeUtils();
+        this.elements = env.getElementUtils();
+        this.filer = env.getFiler();
     }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (annotations.isEmpty()) return false;
-        TypeElement configAnnotation = annotations.iterator().next(); // must have one annotation
+        if (!annotations.contains(elements.getTypeElement(Configuration.class.getCanonicalName()))) return false;
 
-        for (var element : roundEnv.getElementsAnnotatedWith(configAnnotation)) {
+        for (var element : roundEnv.getElementsAnnotatedWith(Configuration.class)) {
             if (element.getKind() != ElementKind.INTERFACE) {
                 messager.printError("Only interfaces can be annotated.", element);
                 return true;
             }
-            var javaFile = processRoot((TypeElement) element, null);
-            if (javaFile == null) return true; // if error occurs exit
+
+            try {
+                var tomlParseResult = parseDefaultConfig(element);
+                processRoot((TypeElement) element, null, tomlParseResult);
+            } catch (Throwable e) {
+                messager.printError(
+                        "Exception during generation of config implementation: %s".formatted(e.toString()));
+            }
         }
 
         return true;
@@ -107,29 +118,51 @@ public class ConfigProcessor extends AbstractProcessor {
      * @param path    the curren path, null if root (@Configuration annotated class)
      * @return the generated JavaFile
      */
-    private JavaFile processRoot(TypeElement element, String path) {
+    private JavaFile processRoot(TypeElement element, String path, TomlParseResult tomlTable) {
         var oldPath = currentPath;
         var oldWriter = currentWriter;
 
-        currentPath = path;
-        currentWriter = new ConfigWriter(element, elements);
-
-        var generated = generatedClasses.computeIfAbsent(element, key -> {
-
-            element.getEnclosedElements()
-                   .forEach(this::processMethod);
-
+        return generatedClasses.computeIfAbsent(element, key -> {
+            currentPath = path;
             try {
+                currentWriter = new ConfigWriter(tomlTable, element, elements);
+
+                element.getEnclosedElements()
+                       .forEach(e -> processMethod(e, tomlTable));
+
                 return currentWriter.generate(filer);
             } catch (IOException e) {
-                messager.printError("Failed to save generated file: %s".formatted(e.toString()));
-                return null;
+                throw new RuntimeException(e);
+            } finally {
+                currentPath = oldPath;
+                currentWriter = oldWriter;
             }
         });
+    }
 
-        currentPath = oldPath;
-        currentWriter = oldWriter;
-        return generated;
+    private TomlParseResult parseDefaultConfig(AnnotatedConstruct element) throws IOException {
+        var configName = element.getAnnotation(Configuration.class).value();
+        var config = getConfigDefault(configName);
+        var result = Toml.parse(config);
+        if (result.hasErrors()) {
+            messager.printError("Default config %s contains errors: %s".formatted(configName,
+                    result.errors()
+            ));
+        }
+        return result;
+    }
+
+    /**
+     * Returns the path of the default config
+     *
+     * @param path the configs name under resources/defaults
+     * @return the path
+     * @throws IOException see {@link Filer#getResource(JavaFileManager.Location, CharSequence, CharSequence)}
+     */
+    private Path getConfigDefault(String path) throws IOException {
+        var root = Path.of(filer.getResource(StandardLocation.CLASS_OUTPUT, "", "dummy").toUri());
+        for (int i = 0; i < 5; i++) root = root.getParent();
+        return Path.of(root.toString(), "src", "main", "resources", "defaults", path);
     }
 
     /**
@@ -137,7 +170,7 @@ public class ConfigProcessor extends AbstractProcessor {
      *
      * @param element the method
      */
-    private void processMethod(Element element) {
+    private void processMethod(Element element, TomlParseResult tomlTable) {
         var modifiers = element.getModifiers();
         if (element instanceof ExecutableElement method && !modifiers.contains(Modifier.STATIC) &&
             !modifiers.contains(Modifier.DEFAULT)) {
@@ -152,7 +185,7 @@ public class ConfigProcessor extends AbstractProcessor {
             if (tomlType != null) {
                 currentWriter.addProperty(new PropertyDescriptor(name, method, tomlType));
             } else if (returnElement.getKind() == ElementKind.INTERFACE) {
-                var javaFile = processRoot((TypeElement) returnElement, name);
+                var javaFile = processRoot((TypeElement) returnElement, name, tomlTable);
                 if (javaFile == null) return; // exit if error
                 currentWriter.addDelegate(method, javaFile);
             }

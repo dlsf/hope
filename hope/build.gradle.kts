@@ -13,6 +13,7 @@ repositories {
 dependencies {
     annotationProcessor(project(":processor"))
 
+    implementation(project(":processor"))
     implementation("org.json", "json", "20220924")
     implementation("org.tomlj", "tomlj", "1.1.0")
 

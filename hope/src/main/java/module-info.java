@@ -4,4 +4,6 @@ module io.github.madethoughts.hope {
     requires org.json;
     requires java.net.http;
     requires org.tomlj;
+
+    requires io.github.madethoughts.hope.processor;
 }

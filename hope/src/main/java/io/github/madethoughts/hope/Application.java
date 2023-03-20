@@ -38,7 +38,7 @@ public final class Application {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        var defaultConfig = Toml.parse(Application.class.getResourceAsStream("/config.toml"));
+        var defaultConfig = Toml.parse(Application.class.getResourceAsStream("/defaults/config.toml"));
         var serverConfig = ServerConfig.newConfig(Toml.parse(config), defaultConfig);
         System.out.println(serverConfig.maxPlayers());
         System.out.println(serverConfig.networking().host());

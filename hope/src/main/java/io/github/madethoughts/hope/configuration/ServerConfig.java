@@ -18,14 +18,13 @@
 
 package io.github.madethoughts.hope.configuration;
 
+import io.github.madethoughts.hope.configuration.processor.Configuration;
 import org.tomlj.TomlTable;
 
-@Configuration
+@Configuration("config.toml")
 public interface ServerConfig {
     static ServerConfig newConfig(TomlTable config, TomlTable defaultConfig) {
-        var serverConfig = new ServerConfig$Implementation();
-        serverConfig.load(config, defaultConfig);
-        return serverConfig;
+        return null;
     }
 
     int maxPlayers();
