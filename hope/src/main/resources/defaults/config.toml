@@ -1,0 +1,7 @@
+version = 2
+motd = "A new hope minecraft server!"
+max_players = 20
+
+[networking]
+port = 25565
+host = "localhost"

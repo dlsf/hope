@@ -18,7 +18,9 @@
 
 package io.github.madethoughts.hope;
 
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.network.Gatekeeper;
+import org.tomlj.Toml;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -28,10 +30,21 @@ import java.net.InetSocketAddress;
  */
 public final class Application {
 
+    public static final String config = """
+                                        version = 2
+                                        networking.host = "Overridden host haha"
+                                        """;
+
     private Application() {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
+        var serverConfig = ServerConfig.newConfig(Toml.parse(config));
+        System.out.println(serverConfig.checkVersion());
+        System.out.println(serverConfig.maxPlayers());
+        System.out.println(serverConfig.networking().host());
+        System.out.println(serverConfig.version());
+
         var socketHandler = Gatekeeper.openAndListen(new InetSocketAddress(25565));
         try (socketHandler) {
             System.out.printf("Listening on %n", socketHandler.address());
