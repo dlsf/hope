@@ -24,12 +24,16 @@ public interface AbstractConfig {
     int defaultVersion();
 
     default CheckVersionResult checkVersion() {
-        var version = version();
-        var defaultVersion = defaultVersion();
+        try {
+            var version = version();
+            var defaultVersion = defaultVersion();
 
-        if (version > defaultVersion) return CheckVersionResult.INVALID;
-        if (defaultVersion > version) return CheckVersionResult.OUTDATED;
-        return CheckVersionResult.UP_TO_DATE;
+            if (version > defaultVersion) return CheckVersionResult.INVALID;
+            if (defaultVersion > version) return CheckVersionResult.OUTDATED;
+            return CheckVersionResult.UP_TO_DATE;
+        } catch (IllegalStateException e) {
+            return CheckVersionResult.INVALID;
+        }
     }
 
     enum CheckVersionResult {

@@ -18,7 +18,10 @@
 
 package io.github.madethoughts.hope.network;
 
+import io.github.madethoughts.hope.configuration.NetworkingConfig;
+
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -50,22 +53,23 @@ public final class Gatekeeper implements AutoCloseable {
      * Constructs a new packet pipeline including a {@link ServerSocketChannel} and starts listening
      * for connections and packets.
      *
-     * @param address the address the socket is bound to
+     * @param config the {@link NetworkingConfig} to be used
      * @return the Pipeline used to listen for packets
      * @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
      * @throws RuntimeException some exception from one of the virtual threads
      */
-    public static Gatekeeper openAndListen(SocketAddress address) throws IOException {
+    public static Gatekeeper openAndListen(NetworkingConfig config) throws IOException {
         var channel = ServerSocketChannel.open();
-        channel.socket().bind(address);
+        channel.socket().bind(new InetSocketAddress(config.host(), config.port()));
         var handler = new Gatekeeper(channel);
         handler.listenerThread.start();
         return handler;
     }
 
     private void listenForConnections() {
-        while (socketChannel.isOpen()) {
-            try {
+        try {
+            log.info("Listen for connections on %s".formatted(socketChannel.getLocalAddress()));
+            while (socketChannel.isOpen()) {
                 var clientChannel = socketChannel.accept();
                 var remoteAddress = clientChannel.getRemoteAddress();
 
@@ -77,23 +81,16 @@ public final class Gatekeeper implements AutoCloseable {
                 var sender = Thread.startVirtualThread(new PacketSender(connection));
                 sender.setName("Sender for %s".formatted(remoteAddress));
 
-                Thread.startVirtualThread(new PacketReceiver(connection, sender))
+                Thread.startVirtualThread(() -> {
+                          new PacketReceiver(connection, sender).run(); // will block until connection closed.
+                          connections.remove(remoteAddress);
+                          log.info("Connection %s closed".formatted(remoteAddress));
+                      })
                       .setName("Listener for %s".formatted(remoteAddress));
-            } catch (IOException e) {
-                // TODO: 2/9/23 logging
-                // TODO: 3/11/23 should shutdown server
-                throw new RuntimeException(e);
             }
-
+        } catch (IOException e) {
+            log.throwing(Gatekeeper.class.getName(), "listenForConnections", e);
         }
-    }
-
-    /**
-     * @return the SocketAddress the socket is listening on
-     * @throws IOException see {@link SocketChannel#getLocalAddress()}
-     */
-    public SocketAddress address() throws IOException {
-        return socketChannel.getLocalAddress();
     }
 
     /**

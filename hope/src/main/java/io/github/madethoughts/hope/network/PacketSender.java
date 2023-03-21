@@ -21,7 +21,6 @@ package io.github.madethoughts.hope.network;
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
 
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
@@ -52,16 +51,20 @@ public class PacketSender implements Runnable {
 
     @Override
     public void run() {
-        var channel = connection.socketChannel();
-        SocketAddress address = null;
-
-        try (channel) {
-            address = channel.getRemoteAddress();
-
+        try (var channel = connection.socketChannel()) {
+            var remoteAddress = channel.getRemoteAddress();
             while (channel.isOpen()) {
                 var packet = packetQueue.take();
-                deserialize(packet);
 
+                // deserialize packet
+                buffer.clear();
+                buffer.writeVarInt(packet.id());
+                packet.serialize(buffer);
+
+                lengthBuffer.clear();
+                ResizableByteBuffer.writeVarInt(lengthBuffer, buffer.position());
+
+                // encrypt packet
                 var encryptor = connection.encryptor();
                 if (encryptor != null) {
                     lengthBuffer.flip();
@@ -70,31 +73,22 @@ public class PacketSender implements Runnable {
                     encryptor.update(buffer.nioBuffer());
                 }
 
+                // write packet
                 channel.write(lengthBuffer.flip());
                 channel.write(buffer.nioBuffer().flip());
 
-                log.info("Send %s to %s || Encrypted: %s".formatted(packet, channel.getRemoteAddress(),
-                        connection.encryptor() != null
+                log.fine(() -> "Send %s to %s || Encrypted: %s".formatted(
+                        packet, remoteAddress, connection.encryptor() != null
                 ));
 
-                // closing connection when PingResponse is sent
+                // closing connection if PingResponse is sent
                 if (connection.state() == State.STATUS && packet instanceof PingResponse) {
                     channel.shutdownInput();
                 }
             }
-        } catch (InterruptedException ignored) { // likely to be thrown by PacketReceiver
+        } catch (InterruptedException ignored) { // likely to be caused by PacketReceiver
         } catch (Throwable e) {
-            log.info("Unexpected exception in PacketSender for %s: %s".formatted(address, e));
+            log.throwing(PacketSender.class.getName(), "run", e);
         }
-        log.info("Closed sender for %s".formatted(address));
-    }
-
-    private void deserialize(ClientboundPacket packet) {
-        buffer.clear();
-        buffer.writeVarInt(packet.id());
-        packet.serialize(buffer);
-
-        lengthBuffer.clear();
-        ResizableByteBuffer.writeVarInt(lengthBuffer, buffer.position());
     }
 }
