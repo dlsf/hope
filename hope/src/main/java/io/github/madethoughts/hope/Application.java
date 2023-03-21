@@ -31,6 +31,7 @@ import java.net.InetSocketAddress;
 public final class Application {
 
     public static final String config = """
+                                        version = 2
                                         networking.host = "Overridden host haha"
                                         """;
 
@@ -38,10 +39,11 @@ public final class Application {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        var defaultConfig = Toml.parse(Application.class.getResourceAsStream("/defaults/config.toml"));
-        var serverConfig = ServerConfig.newConfig(Toml.parse(config), defaultConfig);
+        var serverConfig = ServerConfig.newConfig(Toml.parse(config));
+        System.out.println(serverConfig.checkVersion());
         System.out.println(serverConfig.maxPlayers());
         System.out.println(serverConfig.networking().host());
+        System.out.println(serverConfig.version());
 
         var socketHandler = Gatekeeper.openAndListen(new InetSocketAddress(25565));
         try (socketHandler) {

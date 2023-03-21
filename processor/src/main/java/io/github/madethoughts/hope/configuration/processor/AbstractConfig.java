@@ -16,24 +16,25 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.configuration;
+package io.github.madethoughts.hope.configuration.processor;
 
-import io.github.madethoughts.hope.configuration.processor.AbstractConfig;
-import io.github.madethoughts.hope.configuration.processor.Configuration;
-import org.tomlj.TomlTable;
+public interface AbstractConfig {
+    int version();
 
-@Configuration(value = "config.toml", version = 2)
-public interface ServerConfig extends AbstractConfig {
+    int defaultVersion();
 
-    static ServerConfig newConfig(TomlTable toml) {
-        var config = new ServerConfig$Implementation();
-        config.load(toml);
-        return config;
+    default CheckVersionResult checkVersion() {
+        var version = version();
+        var defaultVersion = defaultVersion();
+
+        if (version > defaultVersion) return CheckVersionResult.INVALID;
+        if (defaultVersion > version) return CheckVersionResult.OUTDATED;
+        return CheckVersionResult.UP_TO_DATE;
     }
 
-    int maxPlayers();
-
-    String motd();
-
-    NetworkingConfig networking();
+    enum CheckVersionResult {
+        UP_TO_DATE,
+        OUTDATED,
+        INVALID
+    }
 }

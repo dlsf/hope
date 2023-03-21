@@ -26,5 +26,13 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface Configuration {
+    /**
+     * @return the default config's file name in resources/defaults
+     */
     String value();
+
+    /**
+     * @return the config version
+     */
+    int version();
 }

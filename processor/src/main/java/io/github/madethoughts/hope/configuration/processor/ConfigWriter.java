@@ -78,6 +78,30 @@ public final class ConfigWriter {
     }
 
     /**
+     * Adds an implementation for a version getter
+     */
+    public void addVersionGetter(ExecutableElement element) {
+        var method = MethodSpec.overriding(element)
+                               .addStatement("var version = (int) $N.getLong($S, () -> -1)", tomlField, "version")
+                               .addStatement("if (version < 1) throw new IllegalStateException($S)",
+                                       "The config's version field is missing or has an invalid value."
+                               )
+                               .addStatement("return version")
+                               .build();
+        typeSpecBuilder.addMethod(method);
+    }
+
+    /**
+     * Adds an implementation for a version getter
+     */
+    public void addDefaultVersionGetter(ExecutableElement element) {
+        var method = MethodSpec.overriding(element)
+                               .addStatement("return $L", defaultValues.get("version"))
+                               .build();
+        typeSpecBuilder.addMethod(method);
+    }
+
+    /**
      * Adds a delegate to an inner config (toml table).
      *
      * @param element the interface method
@@ -107,6 +131,9 @@ public final class ConfigWriter {
         var kind = descriptor.kind();
 
         var defaultValue = defaultValues.get(name);
+        if (defaultValue == null) {
+            throw new IllegalArgumentException("Default value is missing for %s.".formatted(name));
+        }
         if (!kind.rightType(defaultValue)) {
             throw new IllegalArgumentException("Default value is of wrong type. Excepted: %s, got: %s"
                     .formatted(kind, TomlKind.forClass(defaultValue.getClass())));

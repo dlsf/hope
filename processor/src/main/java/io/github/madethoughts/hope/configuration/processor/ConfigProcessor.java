@@ -20,7 +20,7 @@ package io.github.madethoughts.hope.configuration.processor;
 
 import com.squareup.javapoet.JavaFile;
 import org.tomlj.Toml;
-import org.tomlj.TomlParseResult;
+import org.tomlj.TomlTable;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -29,7 +29,6 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
-import javax.lang.model.AnnotatedConstruct;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -39,10 +38,11 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.JavaFileManager;
 import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,6 +60,8 @@ public class ConfigProcessor extends AbstractProcessor {
 
     private final Map<Element, JavaFile> generatedClasses = new ConcurrentHashMap<>();
 
+    private Element currentElement = null;
+
     private Messager messager;
     private Types types;
     private Elements elements;
@@ -68,6 +70,12 @@ public class ConfigProcessor extends AbstractProcessor {
 
     private String currentPath;
     private ConfigWriter currentWriter;
+
+    private TypeMirror abstractConfigType;
+    private TypeMirror stringElement;
+
+    // the default config dir, resolved assuming the default gradle project structure
+    private Path defaultsDir;
 
     public static String camelToSnake(String str) {
         var regex = "([a-z])([A-Z]+)";
@@ -87,6 +95,16 @@ public class ConfigProcessor extends AbstractProcessor {
         this.types = env.getTypeUtils();
         this.elements = env.getElementUtils();
         this.filer = env.getFiler();
+        this.abstractConfigType = elements.getTypeElement(AbstractConfig.class.getCanonicalName()).asType();
+        this.stringElement = elements.getTypeElement(String.class.getCanonicalName()).asType();
+
+        try {
+            var root = Path.of(filer.getResource(StandardLocation.CLASS_OUTPUT, "", "dummy").toUri());
+            for (int i = 0; i < 5; i++) root = root.getParent();
+            this.defaultsDir = Path.of(root.toString(), "src", "main", "resources", "defaults");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -99,12 +117,44 @@ public class ConfigProcessor extends AbstractProcessor {
                 return true;
             }
 
+            var typeElement = (TypeElement) element;
+
+            if (!typeElement.getInterfaces().contains(abstractConfigType)) {
+                messager.printError("Interface must implement AbstractConfig", element);
+                return true;
+            }
+
             try {
-                var tomlParseResult = parseDefaultConfig(element);
-                processRoot((TypeElement) element, null, tomlParseResult);
+                var annotation = element.getAnnotation(Configuration.class);
+                var configResult = Toml.parse(defaultsDir.resolve(annotation.value()));
+                if (configResult.hasErrors()) {
+                    messager.printError("Default config %s contains errors: %s"
+                            .formatted(annotation.value(), configResult.errors()), element);
+                    continue;
+                }
+
+                // validate config version
+                var interfaceVersion = annotation.version();
+                var version = configResult.getLong("version");
+                if (version == null) {
+                    messager.printError("Default config must have version field.", element);
+                    continue;
+                }
+                if (interfaceVersion > version) {
+                    messager.printError("Default config is outdated.", element);
+                    continue;
+                }
+                if (version > interfaceVersion) {
+                    messager.printError("Interface version is outdated.", element);
+                    continue;
+                }
+
+                processRoot(typeElement, null, configResult);
             } catch (Throwable e) {
                 messager.printError(
-                        "Exception during generation of config implementation: %s".formatted(e.toString()));
+                        "Exception during generation of config implementation: %s".formatted(e.toString()),
+                        currentElement
+                );
             }
         }
 
@@ -114,21 +164,75 @@ public class ConfigProcessor extends AbstractProcessor {
     /**
      * Generates a new interface implementation
      *
-     * @param element The interface
-     * @param path    the curren path, null if root (@Configuration annotated class)
+     * @param root The interface
+     * @param path the curren path, null if root (@Configuration annotated class)
      * @return the generated JavaFile
      */
-    private JavaFile processRoot(TypeElement element, String path, TomlParseResult tomlTable) {
+    private JavaFile processRoot(TypeElement root, String path, TomlTable tomlTable) {
+        currentElement = root;
+
         var oldPath = currentPath;
         var oldWriter = currentWriter;
 
-        return generatedClasses.computeIfAbsent(element, key -> {
+        return generatedClasses.computeIfAbsent(root, key -> {
             currentPath = path;
             try {
-                currentWriter = new ConfigWriter(tomlTable, element, elements);
+                currentWriter = new ConfigWriter(tomlTable, root, elements);
 
-                element.getEnclosedElements()
-                       .forEach(e -> processMethod(e, tomlTable));
+                // aggregate elements of interface and extended ones
+                var aggregatedElements = new ArrayList<Element>(root.getEnclosedElements());
+                var interfaceElements = root.getInterfaces()
+                                            .stream()
+                                            .map(types::asElement)
+                                            .map(Element::getEnclosedElements)
+                                            .flatMap(List::stream)
+                                            .toList();
+                aggregatedElements.addAll(interfaceElements);
+
+                // compute each implementation
+                for (var element : aggregatedElements) {
+                    currentElement = element;
+
+                    var modifiers = element.getModifiers();
+                    if (element instanceof ExecutableElement method && !modifiers.contains(Modifier.STATIC) &&
+                        !modifiers.contains(Modifier.DEFAULT)) {
+                        var returnType = method.getReturnType();
+                        var methodName = camelToSnake(method.getSimpleName().toString());
+                        var name = currentPath != null
+                                   ? "%s.%s".formatted(currentPath, methodName)
+                                   : methodName;
+
+                        // special cases for needed methods
+                        if ("version".equals(name)) {
+                            currentWriter.addVersionGetter(method);
+                            continue;
+                        }
+
+                        if ("default_version".equals(name)) {
+                            currentWriter.addDefaultVersionGetter(method);
+                            continue;
+                        }
+
+                        // Map java type to corresponding toml kind
+                        var tomlType = (TomlKind) switch (returnType.getKind()) {
+                            case BYTE, INT, SHORT, LONG -> TomlKind.INTEGER;
+                            case FLOAT, DOUBLE -> TomlKind.FLOAT;
+                            case DECLARED -> {
+                                if (types.isSameType(stringElement, returnType)) yield TomlKind.STRING;
+                                yield null;
+                            }
+                            default -> unsupportedTypeException(returnType);
+                        };
+
+                        var returnElement = types.asElement(returnType);
+                        if (tomlType != null) {
+                            currentWriter.addProperty(new PropertyDescriptor(name, method, tomlType));
+                        } else if (returnElement.getKind() == ElementKind.INTERFACE) {
+                            var javaFile = processRoot((TypeElement) returnElement, name, tomlTable);
+                            currentWriter.addDelegate(method, javaFile);
+                        }
+                    }
+                }
 
                 return currentWriter.generate(filer);
             } catch (IOException e) {
@@ -138,88 +242,6 @@ public class ConfigProcessor extends AbstractProcessor {
                 currentWriter = oldWriter;
             }
         });
-    }
-
-    private TomlParseResult parseDefaultConfig(AnnotatedConstruct element) throws IOException {
-        var configName = element.getAnnotation(Configuration.class).value();
-        var config = getConfigDefault(configName);
-        var result = Toml.parse(config);
-        if (result.hasErrors()) {
-            messager.printError("Default config %s contains errors: %s".formatted(configName,
-                    result.errors()
-            ));
-        }
-        return result;
-    }
-
-    /**
-     * Returns the path of the default config
-     *
-     * @param path the configs name under resources/defaults
-     * @return the path
-     * @throws IOException see {@link Filer#getResource(JavaFileManager.Location, CharSequence, CharSequence)}
-     */
-    private Path getConfigDefault(String path) throws IOException {
-        var root = Path.of(filer.getResource(StandardLocation.CLASS_OUTPUT, "", "dummy").toUri());
-        for (int i = 0; i < 5; i++) root = root.getParent();
-        return Path.of(root.toString(), "src", "main", "resources", "defaults", path);
-    }
-
-    /**
-     * Processes an interface's method and generated an implementation according to the description above.
-     *
-     * @param element the method
-     */
-    private void processMethod(Element element, TomlParseResult tomlTable) {
-        var modifiers = element.getModifiers();
-        if (element instanceof ExecutableElement method && !modifiers.contains(Modifier.STATIC) &&
-            !modifiers.contains(Modifier.DEFAULT)) {
-            var returnType = method.getReturnType();
-            var returnElement = types.asElement(returnType);
-            var methodName = camelToSnake(method.getSimpleName().toString());
-            var name = currentPath != null
-                       ? "%s.%s".formatted(currentPath, methodName)
-                       : methodName;
-
-            var tomlType = tomlKind(returnType);
-            if (tomlType != null) {
-                currentWriter.addProperty(new PropertyDescriptor(name, method, tomlType));
-            } else if (returnElement.getKind() == ElementKind.INTERFACE) {
-                var javaFile = processRoot((TypeElement) returnElement, name, tomlTable);
-                if (javaFile == null) return; // exit if error
-                currentWriter.addDelegate(method, javaFile);
-            }
-        }
-    }
-
-    /**
-     * Maps a TypeMirror to it's corresponding toml data type. Currently, not all types are supported.
-     *
-     * @param typeMirror the TypeMirror
-     * @return the toml data type
-     */
-    private TomlKind tomlKind(TypeMirror typeMirror) {
-        var kind = typeMirror.getKind();
-        return switch (kind) {
-            case BYTE, INT, SHORT, LONG -> TomlKind.INTEGER;
-            case FLOAT, DOUBLE -> TomlKind.FLOAT;
-            case DECLARED -> {
-                if (isString(typeMirror)) yield TomlKind.STRING;
-                yield null;
-            }
-            default -> unsupportedTypeException(typeMirror);
-        };
-    }
-
-    /**
-     * Tests if this TypeMirror is a String
-     *
-     * @param mirror the TypeMirror
-     * @return whether it's a String
-     */
-    private boolean isString(TypeMirror mirror) {
-        var stringElement = elements.getTypeElement(String.class.getCanonicalName()).asType();
-        return types.isSameType(stringElement, mirror);
     }
 
 }
