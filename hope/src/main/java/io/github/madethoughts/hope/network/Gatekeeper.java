@@ -18,7 +18,10 @@
 
 package io.github.madethoughts.hope.network;
 
+import io.github.madethoughts.hope.Server;
 import io.github.madethoughts.hope.configuration.NetworkingConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -27,7 +30,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
 
 /**
  * This gatekeeper waits for new clients to connect, reads/deserializes their packets and puts them in
@@ -36,14 +39,11 @@ import java.util.logging.Logger;
  * @see PacketReceiver
  * @see PacketSender
  */
-public final class Gatekeeper implements AutoCloseable {
+public final class Gatekeeper implements AutoCloseable, Consumer<Server> {
 
-    private static final Logger log = Logger.getAnonymousLogger();
+    private static final Logger log = LoggerFactory.getLogger(Gatekeeper.class);
     private final Map<SocketAddress, Connection> connections = new ConcurrentHashMap<>();
     private final ServerSocketChannel socketChannel;
-    private final Thread listenerThread = Thread.ofVirtual()
-                                                .name("PacketListenerThread")
-                                                .unstarted(this::listenForConnections);
 
     private Gatekeeper(ServerSocketChannel socketChannel) {
         this.socketChannel = socketChannel;
@@ -58,15 +58,14 @@ public final class Gatekeeper implements AutoCloseable {
      * @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
      * @throws RuntimeException some exception from one of the virtual threads
      */
-    public static Gatekeeper openAndListen(NetworkingConfig config) throws IOException {
+    public static Gatekeeper open(NetworkingConfig config) throws IOException {
         var channel = ServerSocketChannel.open();
         channel.socket().bind(new InetSocketAddress(config.host(), config.port()));
-        var handler = new Gatekeeper(channel);
-        handler.listenerThread.start();
-        return handler;
+        return new Gatekeeper(channel);
     }
 
-    private void listenForConnections() {
+    @Override
+    public void accept(Server server) {
         try {
             log.info("Listen for connections on %s".formatted(socketChannel.getLocalAddress()));
             while (socketChannel.isOpen()) {
@@ -78,18 +77,17 @@ public final class Gatekeeper implements AutoCloseable {
                 var connection = new Connection(clientChannel, State.HANDSHAKE);
                 connections.put(remoteAddress, connection);
 
-                var sender = Thread.startVirtualThread(new PacketSender(connection));
-                sender.setName("Sender for %s".formatted(remoteAddress));
+                var sender = Thread.ofVirtual()
+                                   .name("Sender for %s".formatted(remoteAddress))
+                                   .start(new PacketSender(connection));
 
-                Thread.startVirtualThread(() -> {
-                          new PacketReceiver(connection, sender).run(); // will block until connection closed.
-                          connections.remove(remoteAddress);
-                          log.info("Connection %s closed".formatted(remoteAddress));
-                      })
+                Thread.startVirtualThread(new PacketReceiver(connection, sender))
                       .setName("Listener for %s".formatted(remoteAddress));
             }
         } catch (IOException e) {
-            log.throwing(Gatekeeper.class.getName(), "listenForConnections", e);
+            log.error("Unexpected exception in gatekeeper, shutting down server..", e);
+            // shutdown server
+            server.close();
         }
     }
 

@@ -20,11 +20,12 @@ package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Logger;
 
 /**
  * This class is responsible for serializing and sending packets waiting in the {@link Connection#clientboundPackets()}
@@ -35,7 +36,7 @@ import java.util.logging.Logger;
  */
 public class PacketSender implements Runnable {
 
-    private static final Logger log = Logger.getLogger(PacketSender.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(PacketSender.class);
 
     private final Connection connection;
     private final BlockingQueue<ClientboundPacket> packetQueue;
@@ -52,7 +53,6 @@ public class PacketSender implements Runnable {
     @Override
     public void run() {
         try (var channel = connection.socketChannel()) {
-            var remoteAddress = channel.getRemoteAddress();
             while (channel.isOpen()) {
                 var packet = packetQueue.take();
 
@@ -77,9 +77,7 @@ public class PacketSender implements Runnable {
                 channel.write(lengthBuffer.flip());
                 channel.write(buffer.nioBuffer().flip());
 
-                log.fine(() -> "Send %s to %s || Encrypted: %s".formatted(
-                        packet, remoteAddress, connection.encryptor() != null
-                ));
+                log.debug("Send {} || Encrypted: {}", packet, connection.encryptor() != null);
 
                 // closing connection if PingResponse is sent
                 if (connection.state() == State.STATUS && packet instanceof PingResponse) {
@@ -88,7 +86,7 @@ public class PacketSender implements Runnable {
             }
         } catch (InterruptedException ignored) { // likely to be caused by PacketReceiver
         } catch (Throwable e) {
-            log.throwing(PacketSender.class.getName(), "run", e);
+            log.error("Unexpected exception in packet sender, closing connection", e);
         }
     }
 }

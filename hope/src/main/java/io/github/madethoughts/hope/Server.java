@@ -21,17 +21,18 @@ package io.github.madethoughts.hope;
 import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.configuration.ServerConfig$Implementation;
 import io.github.madethoughts.hope.network.Gatekeeper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tomlj.Toml;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.logging.Logger;
 
 public final class Server implements AutoCloseable, Runnable {
 
-    private static final Logger log = Logger.getLogger(Server.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(Server.class);
 
     private final ServerConfig config;
     private final Gatekeeper gatekeeper;
@@ -57,26 +58,36 @@ public final class Server implements AutoCloseable, Runnable {
         }
         var configParsingResult = Toml.parse(configPath);
         if (configParsingResult.hasErrors()) {
-            log.severe("Parsing of config.toml failed, due to: %s".formatted(configParsingResult.errors()));
+            log.error("Parsing of config.toml failed, due to: {}", configParsingResult.errors());
             return null;
         }
 
         // create server config
         serverConfig.load(configParsingResult);
         switch (serverConfig.checkVersion()) {
-            case OUTDATED -> log.severe(
-                    "The config.toml is outdated! Please update the config and increment the version!");
-            case INVALID -> log.severe("The config.toml version is invalid or missing. Please correct it!");
+            case OUTDATED -> {
+                log.error("The config.toml is outdated! Please update the config and increment the version!");
+                return null;
+            }
+            case INVALID -> {
+                log.error("The config.toml version is invalid or missing. Please correct it!");
+                return null;
+            }
             case UP_TO_DATE -> {}
         }
 
-        var gatekeeper = Gatekeeper.openAndListen(serverConfig.networking());
+        var gatekeeper = Gatekeeper.open(serverConfig.networking());
         return new Server(serverConfig, gatekeeper);
     }
 
     @Override
     public void run() {
         try {
+            // start listening for packets
+            Thread.startVirtualThread(() -> gatekeeper.accept(this))
+                  .setName("Gatekeeper");
+
+            // just hold the server alive (development)
             while (true) Thread.sleep(100);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
@@ -84,7 +95,11 @@ public final class Server implements AutoCloseable, Runnable {
     }
 
     @Override
-    public void close() throws IOException {
-        gatekeeper.close();
+    public void close() {
+        try {
+            gatekeeper.close();
+        } catch (Exception e) {
+            log.error("Unexpected exception while shutting down server, potentially resulting in data loss.");
+        }
     }
 }

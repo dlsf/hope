@@ -18,29 +18,24 @@
 
 package io.github.madethoughts.hope;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
 
 /**
  * The programms main entry
  */
 public final class Application {
 
-    private static final Logger log = Logger.getLogger(Application.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(Application.class);
 
     public static void main(String[] args) throws IOException {
-        var loggingConfig = Application.class.getResourceAsStream("/logging.properties");
-        LogManager.getLogManager().readConfiguration(loggingConfig);
-
-        log.finest("test");
-
+        log.info("Starting server..");
         try (var server = Server.setup()) {
             // something went wrong, error should be logged already
             if (server == null) return;
             server.run();
-        } catch (Throwable e) {
-            log.throwing(Application.class.getName(), "main", e);
         }
     }
 }
