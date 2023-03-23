@@ -76,7 +76,7 @@ public final class Server implements AutoCloseable, Runnable {
             case UP_TO_DATE -> {}
         }
 
-        var gatekeeper = Gatekeeper.open(serverConfig.networking());
+        var gatekeeper = Gatekeeper.open(serverConfig);
         return new Server(serverConfig, gatekeeper);
     }
 

@@ -19,6 +19,7 @@
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
+import io.github.madethoughts.hope.network.packets.clientbound.login.LoginDisconnect;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,8 +81,8 @@ public class PacketSender implements Runnable {
                 log.debug("Send {} || Encrypted: {}", packet, connection.encryptor() != null);
 
                 // closing connection if PingResponse is sent
-                if (connection.state() == State.STATUS && packet instanceof PingResponse) {
-                    channel.shutdownInput();
+                if (packet instanceof PingResponse || packet instanceof LoginDisconnect) {
+                    channel.close();
                 }
             }
         } catch (InterruptedException ignored) { // likely to be caused by PacketReceiver

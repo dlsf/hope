@@ -18,6 +18,7 @@
 
 package io.github.madethoughts.hope.network;
 
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.network.handler.HandshakeHandler;
 import io.github.madethoughts.hope.network.handler.LoginHandler;
 import io.github.madethoughts.hope.network.handler.PacketHandler;
@@ -54,9 +55,9 @@ public final class PacketReceiver implements Runnable {
 
     private final Thread senderThread;
 
-    public PacketReceiver(Connection connection, Thread senderThread) {
+    public PacketReceiver(Connection connection, Thread senderThread, ServerConfig config) {
         this.connection = connection;
-        handshakeHandler = new HandshakeHandler(connection);
+        handshakeHandler = new HandshakeHandler(connection, config);
         statusHandler = new StatusHandler(connection);
         loginHandler = new LoginHandler(connection);
         this.senderThread = senderThread;

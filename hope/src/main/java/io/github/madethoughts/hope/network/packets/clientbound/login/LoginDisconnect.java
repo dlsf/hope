@@ -16,17 +16,24 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network;
+package io.github.madethoughts.hope.network.packets.clientbound.login;
 
-/**
- * A wrapper exception over all checked exceptions thrown while (de)serializing or handling packets.
- */
-public class NetworkingException extends Exception {
-    public NetworkingException(Exception underlying) {
-        super(underlying);
+import io.github.madethoughts.hope.network.ResizableByteBuffer;
+import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
+import org.json.JSONObject;
+
+public record LoginDisconnect(String reason) implements ClientboundPacket {
+    @Override
+    public void serialize(ResizableByteBuffer buffer) {
+        // TODO: 3/23/23 add chat support
+        buffer.writeString(
+                new JSONObject()
+                        .put("text", reason).toString()
+        );
     }
 
-    public NetworkingException(String message) {
-        super(message);
+    @Override
+    public int id() {
+        return 0;
     }
 }

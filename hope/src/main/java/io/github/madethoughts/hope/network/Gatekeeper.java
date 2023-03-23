@@ -20,6 +20,7 @@ package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.Server;
 import io.github.madethoughts.hope.configuration.NetworkingConfig;
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,9 +45,11 @@ public final class Gatekeeper implements AutoCloseable, Consumer<Server> {
     private static final Logger log = LoggerFactory.getLogger(Gatekeeper.class);
     private final Map<SocketAddress, Connection> connections = new ConcurrentHashMap<>();
     private final ServerSocketChannel socketChannel;
+    private final ServerConfig config;
 
-    private Gatekeeper(ServerSocketChannel socketChannel) {
+    private Gatekeeper(ServerSocketChannel socketChannel, ServerConfig config) {
         this.socketChannel = socketChannel;
+        this.config = config;
     }
 
     /**
@@ -58,10 +61,10 @@ public final class Gatekeeper implements AutoCloseable, Consumer<Server> {
      * @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
      * @throws RuntimeException some exception from one of the virtual threads
      */
-    public static Gatekeeper open(NetworkingConfig config) throws IOException {
+    public static Gatekeeper open(ServerConfig config) throws IOException {
         var channel = ServerSocketChannel.open();
-        channel.socket().bind(new InetSocketAddress(config.host(), config.port()));
-        return new Gatekeeper(channel);
+        channel.socket().bind(new InetSocketAddress(config.networking().host(), config.networking().port()));
+        return new Gatekeeper(channel, config);
     }
 
     @Override
@@ -81,7 +84,7 @@ public final class Gatekeeper implements AutoCloseable, Consumer<Server> {
                                    .name("Sender for %s".formatted(remoteAddress))
                                    .start(new PacketSender(connection));
 
-                Thread.startVirtualThread(new PacketReceiver(connection, sender))
+                Thread.startVirtualThread(new PacketReceiver(connection, sender, config))
                       .setName("Listener for %s".formatted(remoteAddress));
             }
         } catch (IOException e) {
