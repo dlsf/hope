@@ -16,17 +16,16 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.network;
+package io.github.madethoughts.hope;
 
 /**
- * A wrapper exception over all checked exceptions thrown while (de)serializing or handling packets.
+ * Contains constants that are commonly updated between minecraft versions.
  */
-public class NetworkingException extends Exception {
-    public NetworkingException(Exception underlying) {
-        super(underlying);
-    }
+public final class VersionedConstants {
 
-    public NetworkingException(String message) {
-        super(message);
-    }
+    // mc 1.19.4
+    public static final int PROTOCOL_VERSION = 762;
+    public static final String VERSION = "1.19.4";
+
+    private VersionedConstants() {}
 }

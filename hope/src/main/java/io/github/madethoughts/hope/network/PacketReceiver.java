@@ -18,6 +18,7 @@
 
 package io.github.madethoughts.hope.network;
 
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.network.handler.HandshakeHandler;
 import io.github.madethoughts.hope.network.handler.LoginHandler;
 import io.github.madethoughts.hope.network.handler.PacketHandler;
@@ -25,11 +26,11 @@ import io.github.madethoughts.hope.network.handler.StatusHandler;
 import io.github.madethoughts.hope.network.packets.serverbound.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.net.SocketAddress;
 import java.nio.channels.AsynchronousCloseException;
 import java.nio.channels.SocketChannel;
-import java.util.logging.Logger;
 
 /**
  * This class is responsible for receiving and handling packets send to the sender by a specific connection.
@@ -38,11 +39,12 @@ import java.util.logging.Logger;
  * This receiver supports encrypted data, but no compressed packets.
  * All exceptions thrown while handling (before passed to the game loop), {@link SocketChannel#close()} or an
  * interrupt signal will cause this receiver to stop listening for data, interrupting the {@link PacketSender} threads
- * and closing the underlying {@link SocketChannel}
+ * and closing the underlying {@link SocketChannel}.
+ * If {@link PacketReceiver#run()} returns, the connection is closed.
  */
 public final class PacketReceiver implements Runnable {
 
-    private static final Logger log = Logger.getLogger(PacketReceiver.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(PacketReceiver.class);
 
     private final Connection connection;
     private final ResizableByteBuffer buffer = ResizableByteBuffer.allocateDirect();
@@ -53,22 +55,22 @@ public final class PacketReceiver implements Runnable {
 
     private final Thread senderThread;
 
-    public PacketReceiver(Connection connection, Thread senderThread) {
+    public PacketReceiver(Connection connection, Thread senderThread, ServerConfig config) {
         this.connection = connection;
-        handshakeHandler = new HandshakeHandler(connection);
+        handshakeHandler = new HandshakeHandler(connection, config);
         statusHandler = new StatusHandler(connection);
         loginHandler = new LoginHandler(connection);
         this.senderThread = senderThread;
     }
 
+    /**
+     * Reads and handles packets.
+     * If this method returns, the connection is closed.
+     */
     @Override
     public void run() {
-        var channel = connection.socketChannel();
-        SocketAddress address = null;
-
-        try (channel) {
-            address = channel.getRemoteAddress();
-
+        try (var channel = connection.socketChannel()) {
+            var address = channel.getRemoteAddress();
             var neededBytes = 0;
             while (channel.isOpen() && channel.read(buffer.nioBuffer()) != -1) {
                 if (buffer.position() < neededBytes) continue;
@@ -79,54 +81,42 @@ public final class PacketReceiver implements Runnable {
                     decryptor.update(buffer.nioBuffer());
                 }
 
-                neededBytes = deserializeAndHandle();
+                // deserialize packet(s)
+                outer:
+                while (true) {
+                    buffer.flip();
+                    switch (ServerboundPacket.tryDeserialize(connection.state(), buffer)) {
+                        case DeserializerResult.UnknownPacket(var state, var id) ->
+                                log.error("Unknown packet %s : %s for %s".formatted(state, id, address));
+                        case DeserializerResult.PacketDeserialized(var packet) -> {
+                            log.debug("Got packet {} for {}", packet, address);
+                            switch (packet) {
+                                case Handshake handshake -> handshakeHandler.handle(handshake);
+                                case ServerboundPacket.StatusPacket statusPacket -> statusHandler.handle(statusPacket);
+                                case ServerboundPacket.LoginPacket loginPacket -> loginHandler.handle(loginPacket);
+                            }
+                        }
+                        case DeserializerResult.MoreBytesNeeded(var size) -> {
+                            // don't override data already written in the buffer
+                            var pos = buffer.limit();
+                            buffer.clear();
+                            buffer.position(pos);
+                            neededBytes = size;
+                            break outer;
+                        }
+                    }
+                }
 
                 buffer.ensureCapacity(neededBytes);
             }
-
+        } catch (AsynchronousCloseException ignored) {
+        } catch (Throwable e) {
+            log.error("Unexpected error in packet receiver, closing connection.", e);
+        } finally {
             // interrupt sender thread to stop blocking for incoming packets
             senderThread.interrupt();
 
-            log.info("Disconnected %s".formatted(channel.getRemoteAddress()));
-        } catch (AsynchronousCloseException ignored) {
-        } catch (Throwable e) {
-            log.info("Unexpected exception in PacketReceiver for %s: %s".formatted(address, e));
-        }
-        log.info("Closed receiver for %s".formatted(address));
-    }
-
-    /**
-     * Tries to deserialize all packets currently represented by the read bytes.
-     *
-     * @return the bytes needed for the current or next packet
-     * @throws NetworkingException if any checked exception was thrown
-     */
-    private int deserializeAndHandle() throws NetworkingException {
-        while (true) {
-            buffer.flip();
-            switch (ServerboundPacket.tryDeserialize(connection.state(), buffer)) {
-                case DeserializerResult.UnknownPacket(var ustate, var id) ->
-                        throw new UnsupportedOperationException("unknown packet %s: %s".formatted(ustate, id));
-                case DeserializerResult.PacketDeserialized(var packet) -> {
-                    log.info("Got packet: %s".formatted(packet));
-                    switch (packet) {
-                        case Handshake handshake -> handshakeHandler.handle(handshake);
-                        case ServerboundPacket.StatusPacket statusPacket -> statusHandler.handle(statusPacket);
-                        case ServerboundPacket.LoginPacket loginPacket -> loginHandler.handle(loginPacket);
-                    }
-                    // try to deserialize left bytes
-                    continue;
-                }
-                case DeserializerResult.MoreBytesNeeded(var size) -> {
-                    // don't override data already written in the buffer
-                    var pos = buffer.limit();
-                    buffer.clear();
-                    buffer.position(pos);
-
-                    return size;
-                }
-            }
-            return 1;
+            log.info("Connection closed.");
         }
     }
 }

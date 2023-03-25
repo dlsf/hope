@@ -18,13 +18,20 @@
 
 package io.github.madethoughts.hope.network;
 
+import io.github.madethoughts.hope.Server;
+import io.github.madethoughts.hope.configuration.NetworkingConfig;
+import io.github.madethoughts.hope.configuration.ServerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
 
 /**
  * This gatekeeper waits for new clients to connect, reads/deserializes their packets and puts them in
@@ -33,39 +40,38 @@ import java.util.logging.Logger;
  * @see PacketReceiver
  * @see PacketSender
  */
-public final class Gatekeeper implements AutoCloseable {
+public final class Gatekeeper implements AutoCloseable, Consumer<Server> {
 
-    private static final Logger log = Logger.getAnonymousLogger();
+    private static final Logger log = LoggerFactory.getLogger(Gatekeeper.class);
     private final Map<SocketAddress, Connection> connections = new ConcurrentHashMap<>();
     private final ServerSocketChannel socketChannel;
-    private final Thread listenerThread = Thread.ofVirtual()
-                                                .name("PacketListenerThread")
-                                                .unstarted(this::listenForConnections);
+    private final ServerConfig config;
 
-    private Gatekeeper(ServerSocketChannel socketChannel) {
+    private Gatekeeper(ServerSocketChannel socketChannel, ServerConfig config) {
         this.socketChannel = socketChannel;
+        this.config = config;
     }
 
     /**
      * Constructs a new packet pipeline including a {@link ServerSocketChannel} and starts listening
      * for connections and packets.
      *
-     * @param address the address the socket is bound to
+     * @param config the {@link NetworkingConfig} to be used
      * @return the Pipeline used to listen for packets
      * @throws IOException      see {@link ServerSocketChannel#open()}, {@link SocketChannel#bind(SocketAddress)}
      * @throws RuntimeException some exception from one of the virtual threads
      */
-    public static Gatekeeper openAndListen(SocketAddress address) throws IOException {
+    public static Gatekeeper open(ServerConfig config) throws IOException {
         var channel = ServerSocketChannel.open();
-        channel.socket().bind(address);
-        var handler = new Gatekeeper(channel);
-        handler.listenerThread.start();
-        return handler;
+        channel.socket().bind(new InetSocketAddress(config.networking().host(), config.networking().port()));
+        return new Gatekeeper(channel, config);
     }
 
-    private void listenForConnections() {
-        while (socketChannel.isOpen()) {
-            try {
+    @Override
+    public void accept(Server server) {
+        try {
+            log.info("Listen for connections on %s".formatted(socketChannel.getLocalAddress()));
+            while (socketChannel.isOpen()) {
                 var clientChannel = socketChannel.accept();
                 var remoteAddress = clientChannel.getRemoteAddress();
 
@@ -74,26 +80,18 @@ public final class Gatekeeper implements AutoCloseable {
                 var connection = new Connection(clientChannel, State.HANDSHAKE);
                 connections.put(remoteAddress, connection);
 
-                var sender = Thread.startVirtualThread(new PacketSender(connection));
-                sender.setName("Sender for %s".formatted(remoteAddress));
+                var sender = Thread.ofVirtual()
+                                   .name("Sender for %s".formatted(remoteAddress))
+                                   .start(new PacketSender(connection));
 
-                Thread.startVirtualThread(new PacketReceiver(connection, sender))
+                Thread.startVirtualThread(new PacketReceiver(connection, sender, config))
                       .setName("Listener for %s".formatted(remoteAddress));
-            } catch (IOException e) {
-                // TODO: 2/9/23 logging
-                // TODO: 3/11/23 should shutdown server
-                throw new RuntimeException(e);
             }
-
+        } catch (IOException e) {
+            log.error("Unexpected exception in gatekeeper, shutting down server..", e);
+            // shutdown server
+            server.close();
         }
-    }
-
-    /**
-     * @return the SocketAddress the socket is listening on
-     * @throws IOException see {@link SocketChannel#getLocalAddress()}
-     */
-    public SocketAddress address() throws IOException {
-        return socketChannel.getLocalAddress();
     }
 
     /**

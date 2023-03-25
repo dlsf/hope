@@ -18,20 +18,38 @@
 
 package io.github.madethoughts.hope.network.handler;
 
+import io.github.madethoughts.hope.VersionedConstants;
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.network.Connection;
+import io.github.madethoughts.hope.network.NetworkingException;
+import io.github.madethoughts.hope.network.packets.clientbound.login.LoginDisconnect;
+import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 
 /**
  * This class is responsible for handling the handshake packet.
  */
 public class HandshakeHandler implements PacketHandler<Handshake> {
+    public static final String LOGIN_KICK_MESSAGE =
+            "Your version unsupported, only the version %s is supported. Please update your game!";
     private final Connection connection;
+    private final ServerConfig serverConfig;
 
-    public HandshakeHandler(Connection connection) {this.connection = connection;}
+    public HandshakeHandler(Connection connection, ServerConfig serverConfig) {
+        this.connection = connection;
+        this.serverConfig = serverConfig;
+    }
 
     @Override
-    public void handle(Handshake packet) {
-        // TODO: 3/10/23 protocol version validation
+    public void handle(Handshake packet) throws NetworkingException {
+        if (packet.protocolNumber() != VersionedConstants.PROTOCOL_VERSION) {
+            connection.queuePacket(switch (packet.nextState()) {
+                case STATUS -> new StatusResponse(serverConfig, -1); // player count doesn't matter here
+                case LOGIN -> new LoginDisconnect(LOGIN_KICK_MESSAGE.formatted(VersionedConstants.VERSION));
+                default -> throw new NetworkingException("Unexpected state after handshake");
+            });
+        }
+
         connection.state(packet.nextState());
     }
 }

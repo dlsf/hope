@@ -18,6 +18,8 @@
 
 package io.github.madethoughts.hope.network.packets.clientbound.status;
 
+import io.github.madethoughts.hope.VersionedConstants;
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
 import org.json.JSONArray;
@@ -34,6 +36,18 @@ public record StatusResponse(
         boolean previewChat,
         boolean enforcesSecureChat
 ) implements ClientboundPacket {
+
+    public StatusResponse(ServerConfig config, int onlinePlayers) {
+        // TODO: 3/23/23 previewChat and secureChat
+        this(
+                new Version(VersionedConstants.VERSION, VersionedConstants.PROTOCOL_VERSION),
+                new Players(config.maxPlayers(), onlinePlayers),
+                config.motd(), new byte[0],
+                true,
+                false
+        );
+    }
+
     @Override
     public void serialize(ResizableByteBuffer buffer) {
         var faviconString = "data:image/png;base64," + Base64.getEncoder().encodeToString(favicon());

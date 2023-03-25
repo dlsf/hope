@@ -80,6 +80,7 @@ public final class McCipher {
 
     public void update(ByteBuffer buffer) {
         try {
+            // TODO: 3/23/23 replace with better implementation, avoiding copying
             cipher.update(buffer.duplicate(), buffer);
         } catch (ShortBufferException e) {
             // should not occur

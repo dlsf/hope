@@ -18,47 +18,24 @@
 
 package io.github.madethoughts.hope;
 
-import io.github.madethoughts.hope.configuration.ServerConfig;
-import io.github.madethoughts.hope.network.Gatekeeper;
-import org.tomlj.Toml;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 
 /**
  * The programms main entry
  */
 public final class Application {
 
-    public static final String config = """
-                                        version = 2
-                                        networking.host = "Overridden host haha"
-                                        """;
+    private static final Logger log = LoggerFactory.getLogger(Application.class);
 
-    private Application() {
-    }
-
-    public static void main(String[] args) throws IOException, InterruptedException {
-        var serverConfig = ServerConfig.newConfig(Toml.parse(config));
-        System.out.println(serverConfig.checkVersion());
-        System.out.println(serverConfig.maxPlayers());
-        System.out.println(serverConfig.networking().host());
-        System.out.println(serverConfig.version());
-
-        var socketHandler = Gatekeeper.openAndListen(new InetSocketAddress(25565));
-        try (socketHandler) {
-            System.out.printf("Listening on %n", socketHandler.address());
-            Thread.startVirtualThread(() -> {
-                for (; ; ) {
-                    try {
-                        //                        var packet = socketHandler.packetQueue().take();
-                        //                        Logger.getAnonymousLogger().info("Got packet (play): %s".formatted(packet));
-                        Thread.sleep(100000);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            }).join();
+    public static void main(String[] args) throws IOException {
+        log.info("Starting server..");
+        try (var server = Server.setup()) {
+            // something went wrong, error should be logged already
+            if (server == null) return;
+            server.run();
         }
     }
 }

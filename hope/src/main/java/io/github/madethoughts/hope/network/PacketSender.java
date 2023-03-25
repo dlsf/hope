@@ -19,13 +19,14 @@
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
+import io.github.madethoughts.hope.network.packets.clientbound.login.LoginDisconnect;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
-import java.util.logging.Logger;
 
 /**
  * This class is responsible for serializing and sending packets waiting in the {@link Connection#clientboundPackets()}
@@ -36,7 +37,7 @@ import java.util.logging.Logger;
  */
 public class PacketSender implements Runnable {
 
-    private static final Logger log = Logger.getLogger(PacketSender.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(PacketSender.class);
 
     private final Connection connection;
     private final BlockingQueue<ClientboundPacket> packetQueue;
@@ -52,16 +53,19 @@ public class PacketSender implements Runnable {
 
     @Override
     public void run() {
-        var channel = connection.socketChannel();
-        SocketAddress address = null;
-
-        try (channel) {
-            address = channel.getRemoteAddress();
-
+        try (var channel = connection.socketChannel()) {
             while (channel.isOpen()) {
                 var packet = packetQueue.take();
-                deserialize(packet);
 
+                // deserialize packet
+                buffer.clear();
+                buffer.writeVarInt(packet.id());
+                packet.serialize(buffer);
+
+                lengthBuffer.clear();
+                ResizableByteBuffer.writeVarInt(lengthBuffer, buffer.position());
+
+                // encrypt packet
                 var encryptor = connection.encryptor();
                 if (encryptor != null) {
                     lengthBuffer.flip();
@@ -70,31 +74,20 @@ public class PacketSender implements Runnable {
                     encryptor.update(buffer.nioBuffer());
                 }
 
+                // write packet
                 channel.write(lengthBuffer.flip());
                 channel.write(buffer.nioBuffer().flip());
 
-                log.info("Send %s to %s || Encrypted: %s".formatted(packet, channel.getRemoteAddress(),
-                        connection.encryptor() != null
-                ));
+                log.debug("Send {} || Encrypted: {}", packet, connection.encryptor() != null);
 
-                // closing connection when PingResponse is sent
-                if (connection.state() == State.STATUS && packet instanceof PingResponse) {
-                    channel.shutdownInput();
+                // closing connection if PingResponse is sent
+                if (packet instanceof PingResponse || packet instanceof LoginDisconnect) {
+                    channel.close();
                 }
             }
-        } catch (InterruptedException ignored) { // likely to be thrown by PacketReceiver
+        } catch (InterruptedException ignored) { // likely to be caused by PacketReceiver
         } catch (Throwable e) {
-            log.info("Unexpected exception in PacketSender for %s: %s".formatted(address, e));
+            log.error("Unexpected exception in packet sender, closing connection", e);
         }
-        log.info("Closed sender for %s".formatted(address));
-    }
-
-    private void deserialize(ClientboundPacket packet) {
-        buffer.clear();
-        buffer.writeVarInt(packet.id());
-        packet.serialize(buffer);
-
-        lengthBuffer.clear();
-        ResizableByteBuffer.writeVarInt(lengthBuffer, buffer.position());
     }
 }
