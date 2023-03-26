@@ -18,8 +18,6 @@
 
 package io.github.madethoughts.hope.profile;
 
-import org.json.JSONObject;
-
 import java.util.UUID;
 
 /**
@@ -31,38 +29,4 @@ import java.util.UUID;
 public record PlayerProfile(
         UUID uuid,
         String name
-) {
-    /**
-     * Parses a new player profile from the json returned by the mojang api.
-     *
-     * @param json the json
-     * @return the player profile
-     */
-    public static PlayerProfile fromJson(String json) {
-        var jsonObject = new JSONObject(json);
-        var uuid = uuidFromHex(jsonObject.getString("id"));
-        var name = jsonObject.getString("name");
-
-        return new PlayerProfile(uuid, name);
-    }
-
-    /**
-     * Constructs an uuid from the mojang api's hex representation.
-     *
-     * @param hex the hex sent by mojang
-     * @return the UUID
-     */
-    private static UUID uuidFromHex(String hex) {
-        // adjust uuid format
-        var formattedUUID = hex.substring(0, 8) +
-                            '-' +
-                            hex.substring(8, 12) +
-                            '-' +
-                            hex.substring(12, 16) +
-                            '-' +
-                            hex.substring(16, 20) +
-                            '-' +
-                            hex.substring(20, 30);
-        return UUID.fromString(formattedUUID);
-    }
-}
+) {}

@@ -18,9 +18,20 @@
 
 package io.github.madethoughts.hope;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.ReflectionAccessFilter;
 import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.configuration.ServerConfig$Implementation;
+import io.github.madethoughts.hope.json.deserializers.PlayerProfileDeserializer;
+import io.github.madethoughts.hope.json.serializers.ComponentGsonTypeAdapter;
+import io.github.madethoughts.hope.json.serializers.StatusResponseSerializer;
 import io.github.madethoughts.hope.network.Gatekeeper;
+import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResponse;
+import io.github.madethoughts.hope.profile.PlayerProfile;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.tomlj.Toml;
@@ -32,6 +43,27 @@ import java.nio.file.StandardOpenOption;
 
 public final class Server implements AutoCloseable, Runnable {
 
+    public static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
+    public static final GsonComponentSerializer GSON_COMPONENT_SERIALIZER = GsonComponentSerializer.gson();
+
+    public static final Gson GSON = new GsonBuilder()
+            .addReflectionAccessFilter(ReflectionAccessFilter.BLOCK_ALL_PLATFORM)
+            // -- serializer --
+            .registerTypeHierarchyAdapter(Component.class, new ComponentGsonTypeAdapter())
+            // register status response serializers
+            .registerTypeAdapter(
+                    StatusResponseSerializer.VersionSerializer.class,
+                    new StatusResponseSerializer.VersionSerializer()
+            )
+            .registerTypeAdapter(
+                    StatusResponseSerializer.PlayersSerializer.class,
+                    new StatusResponseSerializer.PlayersSerializer()
+            )
+            .registerTypeAdapter(StatusResponse.class, new StatusResponseSerializer())
+
+            // -- deserializer --
+            .registerTypeAdapter(PlayerProfile.class, new PlayerProfileDeserializer())
+            .create();
     private static final Logger log = LoggerFactory.getLogger(Server.class);
 
     private final ServerConfig config;
@@ -49,7 +81,7 @@ public final class Server implements AutoCloseable, Runnable {
     public static Server setup() throws IOException {
         // read and parse configuration
         var configPath = Path.of("config.toml");
-        var serverConfig = new ServerConfig$Implementation();
+        var serverConfig = new ServerConfig$Implementation(MINI_MESSAGE);
         if (Files.notExists(configPath)) {
             Files.writeString(configPath, "version = %s".formatted(serverConfig.defaultVersion()),
                     StandardOpenOption.CREATE_NEW

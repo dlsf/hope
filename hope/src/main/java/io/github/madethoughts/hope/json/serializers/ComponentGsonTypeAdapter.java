@@ -16,33 +16,19 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-package io.github.madethoughts.hope.configuration.processor;
+package io.github.madethoughts.hope.json.serializers;
 
-import org.tomlj.TomlTable;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
+import io.github.madethoughts.hope.Server;
+import net.kyori.adventure.text.Component;
 
-public interface AbstractConfig {
-    int version();
+import java.lang.reflect.Type;
 
-    int defaultVersion();
-
-    void load(TomlTable tomlTable);
-
-    default CheckVersionResult checkVersion() {
-        try {
-            var version = version();
-            var defaultVersion = defaultVersion();
-
-            if (version > defaultVersion) return CheckVersionResult.INVALID;
-            if (defaultVersion > version) return CheckVersionResult.OUTDATED;
-            return CheckVersionResult.UP_TO_DATE;
-        } catch (IllegalStateException e) {
-            return CheckVersionResult.INVALID;
-        }
-    }
-
-    enum CheckVersionResult {
-        UP_TO_DATE,
-        OUTDATED,
-        INVALID
+public class ComponentGsonTypeAdapter implements JsonSerializer<Component> {
+    @Override
+    public JsonElement serialize(Component src, Type typeOfSrc, JsonSerializationContext context) {
+        return Server.GSON_COMPONENT_SERIALIZER.serializeToTree(src);
     }
 }

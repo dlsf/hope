@@ -20,20 +20,18 @@ package io.github.madethoughts.hope.configuration;
 
 import io.github.madethoughts.hope.configuration.processor.AbstractConfig;
 import io.github.madethoughts.hope.configuration.processor.Configuration;
-import org.tomlj.TomlTable;
+import io.github.madethoughts.hope.configuration.processor.Transformer;
+import net.kyori.adventure.text.Component;
+
+import static io.github.madethoughts.hope.configuration.processor.Transformers.MINI_MESSAGE;
 
 @Configuration(value = "config.toml", version = 2)
 public interface ServerConfig extends AbstractConfig {
 
-    static ServerConfig newConfig(TomlTable toml) {
-        var config = new ServerConfig$Implementation();
-        config.load(toml);
-        return config;
-    }
-
     int maxPlayers();
 
-    String motd();
+    @Transformer(MINI_MESSAGE)
+    Component motd();
 
     NetworkingConfig networking();
 }

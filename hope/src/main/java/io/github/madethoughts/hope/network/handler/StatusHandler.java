@@ -18,6 +18,8 @@
 
 package io.github.madethoughts.hope.network.handler;
 
+import io.github.madethoughts.hope.VersionedConstants;
+import io.github.madethoughts.hope.configuration.ServerConfig;
 import io.github.madethoughts.hope.network.Connection;
 import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.packets.clientbound.status.PingResponse;
@@ -31,23 +33,21 @@ import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequ
  */
 public class StatusHandler implements PacketHandler<ServerboundPacket.StatusPacket> {
     private final Connection connection;
+    private final ServerConfig serverConfig;
 
-    public StatusHandler(Connection connection) {this.connection = connection;}
+    public StatusHandler(Connection connection, ServerConfig serverConfig) {
+        this.connection = connection;
+        this.serverConfig = serverConfig;
+    }
 
     @Override
     public void handle(ServerboundPacket.StatusPacket packet) throws NetworkingException {
         connection.queuePacket(switch (packet) {
-            // TODO: 2/24/23 add real values and config here
+            // TODO: 3/26/23 favicon, previewChat, enforcesSecureChat, max players
             case StatusRequest() -> new StatusResponse(
-                    new StatusResponse.Version("1.19.3", 761),
-                    new StatusResponse.Players(
-                            10,
-                            0
-                    ),
-                    "test hahah",
-                    new byte[0],
-                    false,
-                    false
+                    new StatusResponse.Version(VersionedConstants.VERSION, VersionedConstants.PROTOCOL_VERSION),
+                    new StatusResponse.Players(serverConfig.maxPlayers(), -1), // values doesn't matter here
+                    serverConfig.motd(), new byte[0], false, false
             );
             case PingRequest(var payload) -> new PingResponse(payload);
         });

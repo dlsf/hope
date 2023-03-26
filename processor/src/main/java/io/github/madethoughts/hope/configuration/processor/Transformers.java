@@ -18,31 +18,6 @@
 
 package io.github.madethoughts.hope.configuration.processor;
 
-import org.tomlj.TomlTable;
-
-public interface AbstractConfig {
-    int version();
-
-    int defaultVersion();
-
-    void load(TomlTable tomlTable);
-
-    default CheckVersionResult checkVersion() {
-        try {
-            var version = version();
-            var defaultVersion = defaultVersion();
-
-            if (version > defaultVersion) return CheckVersionResult.INVALID;
-            if (defaultVersion > version) return CheckVersionResult.OUTDATED;
-            return CheckVersionResult.UP_TO_DATE;
-        } catch (IllegalStateException e) {
-            return CheckVersionResult.INVALID;
-        }
-    }
-
-    enum CheckVersionResult {
-        UP_TO_DATE,
-        OUTDATED,
-        INVALID
-    }
+public enum Transformers {
+    MINI_MESSAGE
 }

@@ -18,59 +18,23 @@
 
 package io.github.madethoughts.hope.network.packets.clientbound.status;
 
-import io.github.madethoughts.hope.VersionedConstants;
-import io.github.madethoughts.hope.configuration.ServerConfig;
+import io.github.madethoughts.hope.Server;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.util.Base64;
+import net.kyori.adventure.text.Component;
 
 public record StatusResponse(
         Version version,
         Players players,
-        // todo support chat object
-        String descriptionText,
+        Component chat,
         byte[] favicon,
         boolean previewChat,
         boolean enforcesSecureChat
 ) implements ClientboundPacket {
 
-    public StatusResponse(ServerConfig config, int onlinePlayers) {
-        // TODO: 3/23/23 previewChat and secureChat
-        this(
-                new Version(VersionedConstants.VERSION, VersionedConstants.PROTOCOL_VERSION),
-                new Players(config.maxPlayers(), onlinePlayers),
-                config.motd(), new byte[0],
-                true,
-                false
-        );
-    }
-
     @Override
     public void serialize(ResizableByteBuffer buffer) {
-        var faviconString = "data:image/png;base64," + Base64.getEncoder().encodeToString(favicon());
-
-        var json = new JSONObject()
-                .put("version", new JSONObject()
-                        .put("name", version.name())
-                        .put("protocol", version.protocol())
-                )
-                .put("players", new JSONObject()
-                        .put("max", players.max())
-                        .put("online", players.online())
-                        .put("sample", new JSONArray())
-                )
-                // TODO: 3/12/23 chat support
-                .put("description", new JSONObject()
-                        .put("text", descriptionText())
-                )
-                .put("favicon", faviconString)
-                .put("previewsChat", previewChat())
-                .put("enforcesSecureChat", enforcesSecureChat());
-
-        buffer.writeString(json.toString());
+        buffer.writeString(Server.GSON.toJson(this));
     }
 
     @Override
