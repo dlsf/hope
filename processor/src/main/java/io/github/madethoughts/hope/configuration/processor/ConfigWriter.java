@@ -50,6 +50,8 @@ public final class ConfigWriter {
 
     private final TomlTable defaultValues;
 
+    private final boolean superClass;
+
     private final FieldSpec tomlField;
     private final TypeSpec.Builder typeSpecBuilder;
 
@@ -61,15 +63,20 @@ public final class ConfigWriter {
     private final Map<String, FieldSpec> loadInitialized = new HashMap<>();
     private final List<MethodSpec> loaders = new ArrayList<>();
 
-    public ConfigWriter(TomlTable defaultValues, TypeElement interfaceElement, Elements elements) {
+    public ConfigWriter(TomlTable defaultValues, TypeElement superType, Elements elements) {
         this.defaultValues = defaultValues;
-        this.interfacePackage = elements.getPackageOf(interfaceElement);
+        this.interfacePackage = elements.getPackageOf(superType);
         this.tomlField = FieldSpec.builder(TomlTable.class, "toml", Modifier.PRIVATE)
                                   .build();
-        this.typeSpecBuilder = TypeSpec.classBuilder(interfaceElement.getSimpleName() + "$Implementation")
+        this.typeSpecBuilder = TypeSpec.classBuilder(superType.getSimpleName() + "$Implementation")
                                        .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                                       .addSuperinterface(interfaceElement.asType())
                                        .addField(tomlField);
+        this.superClass = !superType.getKind().isInterface();
+        if (superClass) {
+            typeSpecBuilder.superclass(superType.asType());
+        } else {
+            typeSpecBuilder.addSuperinterface(superType.asType());
+        }
     }
 
     /**
@@ -203,9 +210,11 @@ public final class ConfigWriter {
      */
     public JavaFile generate(Filer filer) throws IOException {
         var loadMethod = MethodSpec.methodBuilder("load")
-                                   .addModifiers(Modifier.PUBLIC, Modifier.SYNCHRONIZED)
+                                   .addModifiers(Modifier.SYNCHRONIZED, Modifier.PUBLIC)
+                                   .addException(Exception.class)
                                    .addParameter(TomlTable.class, "toml")
                                    .addStatement("this.$N = toml", tomlField);
+        if (superClass) loadMethod.addStatement("super.load(toml)");
 
         int i = 0;
         for (var entry : innerConfigFields.entrySet()) {

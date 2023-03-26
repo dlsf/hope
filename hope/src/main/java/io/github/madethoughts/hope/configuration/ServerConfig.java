@@ -22,16 +22,35 @@ import io.github.madethoughts.hope.configuration.processor.AbstractConfig;
 import io.github.madethoughts.hope.configuration.processor.Configuration;
 import io.github.madethoughts.hope.configuration.processor.Transformer;
 import net.kyori.adventure.text.Component;
+import org.tomlj.TomlTable;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static io.github.madethoughts.hope.configuration.processor.Transformers.MINI_MESSAGE;
 
 @Configuration(value = "config.toml", version = 2)
-public interface ServerConfig extends AbstractConfig {
+public abstract class ServerConfig implements AbstractConfig {
 
-    int maxPlayers();
+    public static final Path FAVICON_PATH = Path.of("server-icon.png");
+
+    private byte[] favicon;
+
+    public byte[] favicon() {
+        return favicon;
+    }
+
+    @Override
+    public void load(TomlTable tomlTable) throws Exception {
+        favicon = Files.exists(FAVICON_PATH)
+                  ? Files.readAllBytes(FAVICON_PATH)
+                  : new byte[0];
+    }
+
+    public abstract int maxPlayers();
 
     @Transformer(MINI_MESSAGE)
-    Component motd();
+    public abstract Component motd();
 
-    NetworkingConfig networking();
+    public abstract NetworkingConfig networking();
 }

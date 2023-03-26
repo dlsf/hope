@@ -116,15 +116,15 @@ public class ConfigProcessor extends AbstractProcessor {
         if (!annotations.contains(elements.getTypeElement(Configuration.class.getCanonicalName()))) return false;
 
         for (var element : roundEnv.getElementsAnnotatedWith(Configuration.class)) {
-            if (element.getKind() != ElementKind.INTERFACE) {
-                messager.printError("Only interfaces can be annotated.", element);
+            if (!element.getModifiers().contains(Modifier.ABSTRACT)) {
+                messager.printError("Only abstract classes or interfaces can be annotated.", element);
                 return true;
             }
 
             var typeElement = (TypeElement) element;
 
             if (!typeElement.getInterfaces().contains(abstractConfigType)) {
-                messager.printError("Interface must implement AbstractConfig", element);
+                messager.printError("Class must implement AbstractConfig", element);
                 return true;
             }
 
@@ -199,22 +199,25 @@ public class ConfigProcessor extends AbstractProcessor {
 
                     var modifiers = element.getModifiers();
                     if (element instanceof ExecutableElement method && !modifiers.contains(Modifier.STATIC) &&
-                        !modifiers.contains(Modifier.DEFAULT)) {
+                        (method.isDefault() || modifiers.contains(Modifier.ABSTRACT)) &&
+                        !method.getSimpleName().contentEquals(
+                                "<init>")) {
                         var returnType = method.getReturnType();
                         var methodName = camelToSnake(method.getSimpleName().toString());
                         var name = currentPath != null
                                    ? "%s.%s".formatted(currentPath, methodName)
                                    : methodName;
 
-                        // special cases for needed methods
-                        if ("version".equals(name)) {
-                            currentWriter.addVersionGetter(method);
-                            continue;
-                        }
-
-                        if ("default_version".equals(name)) {
-                            currentWriter.addDefaultVersionGetter(method);
-                            continue;
+                        // special cases
+                        switch (name) {
+                            case "version" -> {
+                                currentWriter.addVersionGetter(method);
+                                continue;
+                            }
+                            case "default_version" -> {
+                                currentWriter.addDefaultVersionGetter(method);
+                                continue;
+                            }
                         }
 
                         // skip load method, will be implemented later
