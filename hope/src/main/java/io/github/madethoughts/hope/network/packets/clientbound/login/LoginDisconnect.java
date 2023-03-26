@@ -18,18 +18,15 @@
 
 package io.github.madethoughts.hope.network.packets.clientbound.login;
 
+import io.github.madethoughts.hope.Server;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.packets.clientbound.ClientboundPacket;
-import org.json.JSONObject;
+import net.kyori.adventure.text.Component;
 
-public record LoginDisconnect(String reason) implements ClientboundPacket {
+public record LoginDisconnect(Component reason) implements ClientboundPacket {
     @Override
     public void serialize(ResizableByteBuffer buffer) {
-        // TODO: 3/23/23 add chat support
-        buffer.writeString(
-                new JSONObject()
-                        .put("text", reason).toString()
-        );
+        buffer.writeString(Server.GSON.toJson(reason));
     }
 
     @Override

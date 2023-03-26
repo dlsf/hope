@@ -57,8 +57,8 @@ public final class PacketReceiver implements Runnable {
 
     public PacketReceiver(Connection connection, Thread senderThread, ServerConfig config) {
         this.connection = connection;
-        handshakeHandler = new HandshakeHandler(connection, config);
-        statusHandler = new StatusHandler(connection);
+        handshakeHandler = new HandshakeHandler(connection);
+        statusHandler = new StatusHandler(connection, config);
         loginHandler = new LoginHandler(connection);
         this.senderThread = senderThread;
     }

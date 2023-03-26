@@ -18,6 +18,7 @@
 
 package io.github.madethoughts.hope.network.handler;
 
+import io.github.madethoughts.hope.Server;
 import io.github.madethoughts.hope.network.Connection;
 import io.github.madethoughts.hope.network.McCipher;
 import io.github.madethoughts.hope.network.NetworkingException;
@@ -109,7 +110,7 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            return PlayerProfile.fromJson(response.body());
+            return Server.GSON.fromJson(response.body(), PlayerProfile.class);
         } catch (NoSuchAlgorithmException | InterruptedException | IOException e) {
             throw new NetworkingException(e);
         }

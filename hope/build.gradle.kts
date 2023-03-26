@@ -14,9 +14,14 @@ dependencies {
     annotationProcessor(project(":processor"))
 
     implementation(project(":processor"))
-    implementation("org.json", "json", "20220924")
     implementation("org.tomlj", "tomlj", "1.1.0")
     implementation("org.slf4j", "slf4j-api", "2.0.7")
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // adventure
+    implementation("net.kyori", "adventure-api", "4.13.0")
+    implementation("net.kyori:adventure-text-serializer-gson:4.13.0")
+    implementation("net.kyori", "adventure-text-minimessage", "4.13.0")
 
     runtimeOnly("ch.qos.logback", "logback-classic", "1.4.6")
 

@@ -19,6 +19,7 @@
 package io.github.madethoughts.hope.configuration.processor;
 
 import com.squareup.javapoet.JavaFile;
+import net.kyori.adventure.text.Component;
 import org.tomlj.Toml;
 import org.tomlj.TomlTable;
 
@@ -44,6 +45,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -73,6 +75,7 @@ public class ConfigProcessor extends AbstractProcessor {
 
     private TypeMirror abstractConfigType;
     private TypeMirror stringElement;
+    private TypeMirror componentElement;
 
     // the default config dir, resolved assuming the default gradle project structure
     private Path defaultsDir;
@@ -97,6 +100,7 @@ public class ConfigProcessor extends AbstractProcessor {
         this.filer = env.getFiler();
         this.abstractConfigType = elements.getTypeElement(AbstractConfig.class.getCanonicalName()).asType();
         this.stringElement = elements.getTypeElement(String.class.getCanonicalName()).asType();
+        this.componentElement = elements.getTypeElement(Component.class.getCanonicalName()).asType();
 
         try {
             var root = Path.of(filer.getResource(StandardLocation.CLASS_OUTPUT, "", "dummy").toUri());
@@ -213,20 +217,33 @@ public class ConfigProcessor extends AbstractProcessor {
                             continue;
                         }
 
+                        // skip load method, will be implemented later
+                        if ("load".equals(name)) continue;
+
                         // Map java type to corresponding toml kind
                         var tomlType = (TomlKind) switch (returnType.getKind()) {
                             case BYTE, INT, SHORT, LONG -> TomlKind.INTEGER;
                             case FLOAT, DOUBLE -> TomlKind.FLOAT;
                             case DECLARED -> {
-                                if (types.isSameType(stringElement, returnType)) yield TomlKind.STRING;
+                                if (types.isSameType(stringElement, returnType) ||
+                                    types.isSameType(componentElement, returnType
+                                    )) {yield TomlKind.STRING;}
                                 yield null;
                             }
                             default -> unsupportedTypeException(returnType);
                         };
-
                         var returnElement = types.asElement(returnType);
                         if (tomlType != null) {
-                            currentWriter.addProperty(new PropertyDescriptor(name, method, tomlType));
+                            var descriptor = new PropertyDescriptor(name, method, tomlType);
+
+                            // apply transformers
+                            var transformerAnn = method.getAnnotation(Transformer.class);
+                            if (transformerAnn != null) {
+                                if (Objects.requireNonNull(transformerAnn.value()) == Transformers.MINI_MESSAGE) {
+                                    currentWriter.addMiniMessage(descriptor);
+                                }
+                            } else {currentWriter.addProperty(descriptor);}
+
                         } else if (returnElement.getKind() == ElementKind.INTERFACE) {
                             var javaFile = processRoot((TypeElement) returnElement, name, tomlTable);
                             currentWriter.addDelegate(method, javaFile);

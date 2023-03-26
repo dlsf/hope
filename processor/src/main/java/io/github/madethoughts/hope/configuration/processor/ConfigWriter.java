@@ -22,8 +22,11 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.tomlj.TomlTable;
 
 import javax.annotation.processing.Filer;
@@ -33,7 +36,10 @@ import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -50,6 +56,10 @@ public final class ConfigWriter {
     private final Map<FieldSpec, JavaFile> innerConfigFields = new HashMap<>();
 
     private final PackageElement interfacePackage;
+
+    private final Map<String, FieldSpec> constructorInitialized = new HashMap<>();
+    private final Map<String, FieldSpec> loadInitialized = new HashMap<>();
+    private final List<MethodSpec> loaders = new ArrayList<>();
 
     public ConfigWriter(TomlTable defaultValues, TypeElement interfaceElement, Elements elements) {
         this.defaultValues = defaultValues;
@@ -119,6 +129,38 @@ public final class ConfigWriter {
         typeSpecBuilder.addMethod(method);
     }
 
+    public void addMiniMessage(PropertyDescriptor descriptor) {
+        var motdField = loadInitField("motd", Component.class);
+        var loader = MethodSpec.methodBuilder("motdInit")
+                               .addStatement("this.$N = $N.deserialize($N.getString($S, () -> $S))", motdField,
+                                       constructorInitField("mm", MiniMessage.class),
+                                       tomlField,
+                                       descriptor.name(), getDefaultValue(descriptor.name(), TomlKind.STRING)
+                               )
+                               .build();
+        var getter = MethodSpec.overriding(descriptor.method())
+                               .addStatement("return $N", motdField)
+                               .build();
+        typeSpecBuilder.addMethod(getter);
+        loaders.add(loader);
+    }
+
+    private FieldSpec loadInitField(String name, Type type) {
+        return loadInitialized.computeIfAbsent(name, key -> {
+            var field = FieldSpec.builder(type, key, Modifier.PRIVATE).build();
+            typeSpecBuilder.addField(field);
+            return field;
+        });
+    }
+
+    private FieldSpec constructorInitField(String name, Type type) {
+        return constructorInitialized.computeIfAbsent(name, key -> {
+            var field = FieldSpec.builder(type, key, Modifier.PRIVATE, Modifier.FINAL).build();
+            typeSpecBuilder.addField(field);
+            return field;
+        });
+    }
+
     /**
      * Adds a simple getter implementation for this specific method (PropertyDescriptor)
      *
@@ -130,23 +172,26 @@ public final class ConfigWriter {
         var name = descriptor.name();
         var kind = descriptor.kind();
 
-        var defaultValue = defaultValues.get(name);
-        if (defaultValue == null) {
-            throw new IllegalArgumentException("Default value is missing for %s.".formatted(name));
-        }
-        if (!kind.rightType(defaultValue)) {
-            throw new IllegalArgumentException("Default value is of wrong type. Excepted: %s, got: %s"
-                    .formatted(kind, TomlKind.forClass(defaultValue.getClass())));
-        }
-
         var method = MethodSpec.overriding(descriptor.method())
                                .addStatement("return ($T) $N.$N($S, () -> %s)".formatted(defaultPlaceholder),
                                        returnType,
                                        tomlField, getterMethod,
-                                       name, defaultValues.get(name)
+                                       name, getDefaultValue(name, kind)
                                )
                                .build();
         typeSpecBuilder.addMethod(method);
+    }
+
+    private Object getDefaultValue(String name, TomlKind expectedKind) {
+        var defaultValue = defaultValues.get(name);
+        if (defaultValue == null) {
+            throw new IllegalArgumentException("Default value is missing for %s.".formatted(name));
+        }
+        if (!expectedKind.rightType(defaultValue)) {
+            throw new IllegalArgumentException("Default value is of wrong type. Excepted: %s, got: %s"
+                    .formatted(expectedKind, TomlKind.forClass(defaultValue.getClass())));
+        }
+        return defaultValue;
     }
 
     /**
@@ -175,8 +220,23 @@ public final class ConfigWriter {
                     .addStatement("this.$N = $N", field, varName);
         }
 
+        // call loader methods
+        for (var loader : loaders) {
+            typeSpecBuilder.addMethod(loader);
+            loadMethod.addStatement("$N()", loader);
+        }
+
+        var constructor = MethodSpec.constructorBuilder()
+                                    .addModifiers(Modifier.PUBLIC);
+        for (var field : constructorInitialized.values()) {
+            var parameterSpec = ParameterSpec.builder(field.type, field.name).build();
+            constructor.addParameter(parameterSpec)
+                       .addStatement("this.$N = $N", field, parameterSpec);
+        }
+
         var spec = typeSpecBuilder
                 .addMethod(loadMethod.build())
+                .addMethod(constructor.build())
                 .build();
         var file = JavaFile.builder(interfacePackage.getQualifiedName().toString(), spec)
                            .build();
