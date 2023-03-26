@@ -43,11 +43,11 @@ public class StatusHandler implements PacketHandler<ServerboundPacket.StatusPack
     @Override
     public void handle(ServerboundPacket.StatusPacket packet) throws NetworkingException {
         connection.queuePacket(switch (packet) {
-            // TODO: 3/26/23 favicon, previewChat, enforcesSecureChat, max players
+            // TODO: 3/26/23 previewChat, enforcesSecureChat, online players
             case StatusRequest() -> new StatusResponse(
                     new StatusResponse.Version(VersionedConstants.VERSION, VersionedConstants.PROTOCOL_VERSION),
                     new StatusResponse.Players(serverConfig.maxPlayers(), -1), // values doesn't matter here
-                    serverConfig.motd(), new byte[0], false, false
+                    serverConfig.motd(), serverConfig.favicon(), false, false
             );
             case PingRequest(var payload) -> new PingResponse(payload);
         });

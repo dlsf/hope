@@ -78,7 +78,7 @@ public final class Server implements AutoCloseable, Runnable {
      * @return a new running server or null if an expected error occurred and got logged
      * @throws IOException any I/O Exception
      */
-    public static Server setup() throws IOException {
+    public static Server setup() throws Exception {
         // read and parse configuration
         var configPath = Path.of("config.toml");
         var serverConfig = new ServerConfig$Implementation(MINI_MESSAGE);

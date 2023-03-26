@@ -25,7 +25,8 @@ public interface AbstractConfig {
 
     int defaultVersion();
 
-    void load(TomlTable tomlTable);
+    @SuppressWarnings("override")
+    void load(TomlTable tomlTable) throws Exception;
 
     default CheckVersionResult checkVersion() {
         try {

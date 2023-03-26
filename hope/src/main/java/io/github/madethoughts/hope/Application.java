@@ -21,8 +21,6 @@ package io.github.madethoughts.hope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 /**
  * The programms main entry
  */
@@ -30,12 +28,14 @@ public final class Application {
 
     private static final Logger log = LoggerFactory.getLogger(Application.class);
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         log.info("Starting server..");
         try (var server = Server.setup()) {
             // something went wrong, error should be logged already
             if (server == null) return;
             server.run();
+        } catch (Exception e) {
+            log.error("Something went wrong during server startup.", e);
         }
     }
 }
