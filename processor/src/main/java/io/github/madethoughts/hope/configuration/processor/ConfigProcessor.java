@@ -57,7 +57,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * implementation.
  */
 @SupportedAnnotationTypes("io.github.madethoughts.hope.configuration.processor.Configuration")
-@SupportedSourceVersion(SourceVersion.RELEASE_19)
+@SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class ConfigProcessor extends AbstractProcessor {
 
     private final Map<Element, JavaFile> generatedClasses = new ConcurrentHashMap<>();

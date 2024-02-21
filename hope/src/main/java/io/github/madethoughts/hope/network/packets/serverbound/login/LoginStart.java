@@ -29,6 +29,6 @@ public record LoginStart(
 ) implements ServerboundPacket.LoginPacket {
     public static final Deserializer<LoginStart> DESERIALIZER = buffer -> new LoginStart(
             buffer.readString(16),
-            buffer.readBoolean() ? buffer.readUUID() : null
+            buffer.readUUID()
     );
 }

@@ -44,9 +44,9 @@ public class StatusHandler implements PacketHandler<ServerboundPacket.StatusPack
     public void handle(ServerboundPacket.StatusPacket packet) throws NetworkingException {
         connection.queuePacket(switch (packet) {
             // TODO: 3/26/23 previewChat, enforcesSecureChat, online players
-            case StatusRequest() -> new StatusResponse(
+            case StatusRequest _ -> new StatusResponse(
                     new StatusResponse.Version(VersionedConstants.VERSION, VersionedConstants.PROTOCOL_VERSION),
-                    new StatusResponse.Players(serverConfig.maxPlayers(), -1), // values doesn't matter here
+                    new StatusResponse.Players(serverConfig.maxPlayers(), -1), // values doesn't matter for now
                     serverConfig.motd(), serverConfig.favicon(), false, false
             );
             case PingRequest(var payload) -> new PingResponse(payload);

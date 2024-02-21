@@ -288,6 +288,14 @@ public final class ResizableByteBuffer {
         return new UUID(readLong(), readLong());
     }
 
+    /**
+     * read a byte form this buffer
+     * @return the read byte
+     */
+    public byte readByte() {
+        return buffer.get();
+    }
+
     // -------------------------------------------------------------------
 
     /**

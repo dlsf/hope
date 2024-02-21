@@ -24,8 +24,8 @@ package io.github.madethoughts.hope;
 public final class VersionedConstants {
 
     // mc 1.19.4
-    public static final int PROTOCOL_VERSION = 762;
-    public static final String VERSION = "1.19.4";
+    public static final int PROTOCOL_VERSION = 765;
+    public static final String VERSION = "1.20.4";
 
     private VersionedConstants() {}
 }

@@ -21,8 +21,12 @@ package io.github.madethoughts.hope.network.packets.serverbound;
 import io.github.madethoughts.hope.network.NetworkingException;
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.State;
+import io.github.madethoughts.hope.network.packets.serverbound.configuration.ClientInformation;
+import io.github.madethoughts.hope.network.packets.serverbound.configuration.FinishConfiguration;
+import io.github.madethoughts.hope.network.packets.serverbound.configuration.PluginMessage;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
 import io.github.madethoughts.hope.network.packets.serverbound.login.EncryptionResponse;
+import io.github.madethoughts.hope.network.packets.serverbound.login.LoginAcknowledged;
 import io.github.madethoughts.hope.network.packets.serverbound.login.LoginStart;
 import io.github.madethoughts.hope.network.packets.serverbound.status.PingRequest;
 import io.github.madethoughts.hope.network.packets.serverbound.status.StatusRequest;
@@ -67,5 +71,7 @@ public sealed interface ServerboundPacket {
 
     sealed interface StatusPacket extends ServerboundPacket permits PingRequest, StatusRequest {}
 
-    sealed interface LoginPacket extends ServerboundPacket permits EncryptionResponse, LoginStart {}
+    sealed interface LoginPacket extends ServerboundPacket permits EncryptionResponse, LoginAcknowledged, LoginStart {}
+
+    sealed interface ConfigurationPacket extends ServerboundPacket permits ClientInformation, FinishConfiguration, PluginMessage {}
 }
