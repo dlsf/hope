@@ -20,6 +20,7 @@ package io.github.madethoughts.hope.network.packets.clientbound;
 
 import io.github.madethoughts.hope.network.ResizableByteBuffer;
 import io.github.madethoughts.hope.network.packets.clientbound.configuration.ClientboundFinishConfiguration;
+import io.github.madethoughts.hope.network.packets.clientbound.configuration.RegistryData;
 import io.github.madethoughts.hope.network.packets.clientbound.login.EncryptionRequest;
 import io.github.madethoughts.hope.network.packets.clientbound.login.LoginDisconnect;
 import io.github.madethoughts.hope.network.packets.clientbound.login.LoginSuccess;
@@ -30,7 +31,7 @@ import io.github.madethoughts.hope.network.packets.clientbound.status.StatusResp
  * Indicated that a packet is client bound and is serializable.
  */
 public sealed interface ClientboundPacket
-        permits ClientboundFinishConfiguration, EncryptionRequest, LoginDisconnect, LoginSuccess, PingResponse, StatusResponse {
+        permits ClientboundFinishConfiguration, RegistryData, EncryptionRequest, LoginDisconnect, LoginSuccess, PingResponse, StatusResponse {
 
     void serialize(ResizableByteBuffer buffer);
 
