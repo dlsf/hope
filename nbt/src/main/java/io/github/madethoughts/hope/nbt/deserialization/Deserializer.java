@@ -119,7 +119,7 @@ public final class Deserializer {
 
     private String unwrappedString() {
         // unsigned short
-        int length = buffer.getShort();
+        int length = buffer.getChar();
         var bytes = new byte[length];
         buffer.get(bytes);
         return new String(bytes, StandardCharsets.UTF_8);
