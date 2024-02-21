@@ -82,8 +82,14 @@ public final class Serializer {
         var bytes = value.getBytes(StandardCharsets.UTF_8);
         if (bytes.length > Short.MAX_VALUE)
             throw new NBTSerializationException(FMT."String length exceed maximum of \{Short.MAX_VALUE}");
-        writeShort((short) bytes.length);
+        writeChar((char) bytes.length);
         out.write(bytes);
+    }
+
+    private void writeChar(char value) throws IOException {
+        numberBuffer.clear();
+        numberBuffer.putChar(value);
+        out.write(numberBuffer.array(), 0, 2);
     }
 
     private void writeShort(short value) throws IOException {
