@@ -16,3 +16,9 @@ dependencies {
     implementation("net.kyori", "adventure-api", "4.13.0")
     implementation("net.kyori", "adventure-text-minimessage", "4.13.0")
 }
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}

@@ -27,6 +27,7 @@ import io.github.madethoughts.hope.network.packets.clientbound.login.EncryptionR
 import io.github.madethoughts.hope.network.packets.clientbound.login.LoginSuccess;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 import io.github.madethoughts.hope.network.packets.serverbound.login.EncryptionResponse;
+import io.github.madethoughts.hope.network.packets.serverbound.login.LoginAcknowledged;
 import io.github.madethoughts.hope.network.packets.serverbound.login.LoginStart;
 import io.github.madethoughts.hope.profile.PlayerProfile;
 
@@ -64,6 +65,7 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
         switch (packet) {
             case LoginStart start -> handleLoginStart(start);
             case EncryptionResponse response -> handleEncryptionResponse(response);
+            case LoginAcknowledged _ -> connection.state(State.CONFIGURATION);
         }
     }
 
@@ -84,7 +86,6 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
         connection.playerProfile(playerProfile);
 
         connection.queuePacket(new LoginSuccess(playerProfile.uuid(), playerProfile.name()));
-        connection.state(State.PLAY);
     }
 
     private void handleLoginStart(LoginStart packet) throws NetworkingException {
@@ -105,8 +106,8 @@ public class LoginHandler implements PacketHandler<ServerboundPacket.LoginPacket
 
             // TODO: 3/12/23 implement check for unauthenticated profiles
             var request = HttpRequest.newBuilder()
-                                     .GET()
-                                     .uri(URI.create(MOJANG_HASJOINED_URL.formatted(loginStart.playerName(), hash)))
+                    .GET()
+                    .uri(URI.create(MOJANG_HASJOINED_URL.formatted(loginStart.playerName(), hash)))
                     .build();
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());

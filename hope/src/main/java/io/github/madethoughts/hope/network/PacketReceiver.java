@@ -19,10 +19,7 @@
 package io.github.madethoughts.hope.network;
 
 import io.github.madethoughts.hope.configuration.ServerConfig;
-import io.github.madethoughts.hope.network.handler.HandshakeHandler;
-import io.github.madethoughts.hope.network.handler.LoginHandler;
-import io.github.madethoughts.hope.network.handler.PacketHandler;
-import io.github.madethoughts.hope.network.handler.StatusHandler;
+import io.github.madethoughts.hope.network.handler.*;
 import io.github.madethoughts.hope.network.packets.serverbound.DeserializerResult;
 import io.github.madethoughts.hope.network.packets.serverbound.ServerboundPacket;
 import io.github.madethoughts.hope.network.packets.serverbound.handshake.Handshake;
@@ -53,6 +50,8 @@ public final class PacketReceiver implements Runnable {
     private final PacketHandler<ServerboundPacket.StatusPacket> statusHandler;
     private final PacketHandler<ServerboundPacket.LoginPacket> loginHandler;
 
+    private final PacketHandler<ServerboundPacket.ConfigurationPacket> configurationHandler;
+
     private final Thread senderThread;
 
     public PacketReceiver(Connection connection, Thread senderThread, ServerConfig config) {
@@ -60,6 +59,7 @@ public final class PacketReceiver implements Runnable {
         handshakeHandler = new HandshakeHandler(connection);
         statusHandler = new StatusHandler(connection, config);
         loginHandler = new LoginHandler(connection);
+        configurationHandler = new ConfigurationHandler(connection);
         this.senderThread = senderThread;
     }
 
@@ -94,6 +94,7 @@ public final class PacketReceiver implements Runnable {
                                 case Handshake handshake -> handshakeHandler.handle(handshake);
                                 case ServerboundPacket.StatusPacket statusPacket -> statusHandler.handle(statusPacket);
                                 case ServerboundPacket.LoginPacket loginPacket -> loginHandler.handle(loginPacket);
+                                case ServerboundPacket.ConfigurationPacket configurationPacket -> configurationHandler.handle(configurationPacket);
                             }
                         }
                         case DeserializerResult.MoreBytesNeeded(var size) -> {

@@ -22,13 +22,14 @@ public enum State {
     HANDSHAKE,
     STATUS,
     LOGIN,
+
+    CONFIGURATION,
     PLAY;
 
     public static State deserialize(ResizableByteBuffer buffer, State... permitted) {
         final var errorMsg = "Unexpected state";
 
         var state = (State) switch (buffer.readVarInt()) {
-            case 0 -> HANDSHAKE;
             case 1 -> STATUS;
             case 2 -> LOGIN;
 
