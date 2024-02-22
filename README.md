@@ -1,6 +1,6 @@
 # Hope
 
-Hope is a Minecraft server reimplementation using modern java features such as
+Hope is a Minecraft server reimplementation using modern Java features such as
 virtual threads.
 
 ## Goals
@@ -11,5 +11,5 @@ The goals of this project are:
 - small memory footprint
 - fast startup time
 
-Please notice that this project does not aim to be a 100% accurate vanilla reimplementation.
-It's more an experiment do investigate the new possibilities, that modern java brings us.
+Please note that this project does not aim to be a 100% accurate vanilla reimplementation.
+It's more of an experiment to investigate the new possibilities that modern Java brings us.
