@@ -1,6 +1,6 @@
 name: Conventional commit validation
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   validate-commits:
