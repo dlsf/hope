@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 msg=$(cat "$1")
 result=$(./gradlew validateCommitMessageGit -Pmessage="$msg" --console=plain)
 regex='Error: (.+)BUILD SUCCESSFUL.*'
